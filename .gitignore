@@ -1,0 +1,5 @@
+vendor/
+nbproject/
+.idea/
+/symfony/logs/
+/tests/coverage/

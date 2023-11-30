@@ -1,0 +1,26 @@
+issueToken:
+  url: /issueToken
+  controller: \Monstein\Controllers\IssueTokenController
+  method: [ post ]
+  is_secure: false
+todos:
+  url: /todo
+  controller: \Monstein\Controllers\TodoCollectionController
+  method: [ post , get ]
+todo:
+  url: /todo/{id}
+  controller: \Monstein\Controllers\TodoEntityController
+  method: [ put , get , delete ]
+categories:
+  url: /categories
+  controller: \Monstein\Controllers\CategoryCollectionController
+  method: [ post , get ]
+category:
+  url: /category/{id}
+  controller: \Monstein\Controllers\CategoryEntityController
+  method: [ put , get , delete ]
+category_todos:
+  url: /category/{id}/todos
+  controller: \Monstein\Controllers\CategoryEntityController
+  service : todos
+  method: [  get  ]
