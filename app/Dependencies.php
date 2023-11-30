@@ -65,16 +65,16 @@ class Dependencies {
                 return $c['response']->withJson(['errors' => 'Method not allowed'], HttpCode::HTTP_METHOD_NOT_ALLOWED);
             };
         };
-//        $this->container['phpErrorHandler'] = function($c) {
-//            return function($request, $response) use ($c) {
-//                return $c['response']->withJson(['errors' => 'INTERNAL_SERVER_ERROR'], HttpCode::HTTP_INTERNAL_SERVER_ERROR);
-//            };
-//        };
-//        $this->container['errorHandler'] = function($c) {
-//            return function($request, $response) use ($c) {
-//                return $c['response']->withJson(['errors' => 'INTERNAL_SERVER_ERROR'], HttpCode::HTTP_INTERNAL_SERVER_ERROR);
-//            };
-//        };
+        $this->container['phpErrorHandler'] = function($c) {
+            return function($request, $response) use ($c) {
+                return $c['response']->withJson(['errors' => 'INTERNAL_SERVER_ERROR'], HttpCode::HTTP_INTERNAL_SERVER_ERROR);
+            };
+        };
+        $this->container['errorHandler'] = function($c) {
+            return function($request, $response) use ($c) {
+                return $c['response']->withJson(['errors' => 'INTERNAL_SERVER_ERROR'], HttpCode::HTTP_INTERNAL_SERVER_ERROR);
+            };
+        };
 
 
     }
