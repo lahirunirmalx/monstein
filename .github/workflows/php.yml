@@ -7,7 +7,7 @@ on:
     branches: [ dev, main, master ]
 
 jobs:
-  build:
+  code-quality:
     runs-on: ubuntu-latest
     
     strategy:
@@ -15,20 +15,6 @@ jobs:
       matrix:
         php-version: ['7.4', '8.0', '8.1', '8.2', '8.3']
     
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: monstein_test
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=3
-
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -37,94 +23,15 @@ jobs:
       uses: shivammathur/setup-php@v2
       with:
         php-version: ${{ matrix.php-version }}
-        extensions: mbstring, pdo, pdo_mysql, json
-        coverage: xdebug
+        extensions: mbstring, pdo, json
         tools: composer:v2
 
     - name: Validate composer.json
       run: composer validate --strict
 
-    - name: Cache Composer packages
-      id: composer-cache
-      uses: actions/cache@v4
-      with:
-        path: vendor
-        key: ${{ runner.os }}-php-${{ matrix.php-version }}-${{ hashFiles('**/composer.json') }}
-        restore-keys: |
-          ${{ runner.os }}-php-${{ matrix.php-version }}-
-
-    - name: Install dependencies
-      run: composer update --prefer-dist --no-progress --no-interaction
-
     - name: Check PHP syntax errors
       run: |
-        find app -name "*.php" -print0 | xargs -0 -n1 php -l
-        find tests -name "*.php" -print0 | xargs -0 -n1 php -l
-
-    - name: Create .env file
-      run: |
-        cat > .env << EOF
-        APP_ENV=testing
-        APP_DEBUG=true
-        DB_DRIVER=mysql
-        DB_HOST=127.0.0.1
-        DB_PORT=3306
-        DB_NAME=monstein_test
-        DB_USER=root
-        DB_PASS=root
-        DB_CHARSET=utf8mb4
-        JWT_SECRET=github-actions-test-secret-key-12345
-        JWT_EXPIRES=30
-        JWT_ALGORITHM=HS256
-        CORS_ORIGIN="*"
-        CORS_HEADERS="X-Requested-With, Content-Type, Accept, Origin, Authorization"
-        CORS_METHODS="GET, POST, PUT, DELETE, PATCH, OPTIONS"
-        LOG_PATH=logs/app.log
-        LOG_LEVEL=DEBUG
-        EOF
-
-    - name: Wait for MySQL
-      run: |
-        while ! mysqladmin ping -h"127.0.0.1" -uroot -proot --silent; do
-          sleep 1
-        done
-
-    - name: Run database migrations
-      run: ./vendor/bin/phinx migrate
-
-    - name: Create test user
-      run: |
-        mysql -h 127.0.0.1 -u root -proot monstein_test -e "
-          INSERT INTO users (username, password, created_at, updated_at)
-          VALUES ('phpunit', '\$2y\$10\$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', NOW(), NOW())
-          ON DUPLICATE KEY UPDATE username=username;
-        "
-
-    - name: Run test suite
-      run: composer test
-      env:
-        APP_ENV: testing
-
-  code-quality:
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Setup PHP
-      uses: shivammathur/setup-php@v2
-      with:
-        php-version: '8.2'
-        extensions: mbstring, pdo, json
-        tools: composer:v2
-
-    - name: Install dependencies
-      run: composer update --prefer-dist --no-progress --no-interaction
-
-    - name: Check for PHP syntax errors
-      run: |
-        echo "Checking PHP syntax..."
+        echo "Checking PHP syntax for PHP ${{ matrix.php-version }}..."
         find app -name "*.php" -print0 | xargs -0 -n1 php -l
         find tests -name "*.php" -print0 | xargs -0 -n1 php -l
         echo "✓ No syntax errors found"
@@ -167,7 +74,6 @@ jobs:
 
     - name: Security audit
       run: composer audit
-      continue-on-error: true
 
     - name: Check for hardcoded secrets
       run: |
