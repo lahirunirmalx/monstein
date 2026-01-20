@@ -29,6 +29,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Test bootstrap file for proper test initialization
 - Apache `.htaccess` with security configurations
 - Composer scripts for common tasks (`composer make:resource`, etc.)
+- GitHub Actions CI/CD pipeline (`.github/workflows/php.yml`)
+  - Multi-version PHP testing (7.4, 8.0, 8.1, 8.2, 8.3)
+  - MySQL integration tests
+  - Code quality checks
+  - Security auditing
 
 ### Changed
 - **BREAKING**: Minimum PHP version raised to 7.4

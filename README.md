@@ -504,6 +504,45 @@ protected $casts = [
 - Fixed test namespaces and PHPUnit compatibility
 - Fixed Category cascade delete events
 
+## CI/CD Pipeline
+
+This project includes GitHub Actions for continuous integration.
+
+### Workflow: `.github/workflows/php.yml`
+
+The CI pipeline runs on:
+- Push to `dev`, `main`, or `master` branches
+- Pull requests to these branches
+
+### Jobs
+
+| Job | Description |
+|-----|-------------|
+| **build** | Tests against PHP 7.4, 8.0, 8.1, 8.2, 8.3 with MySQL |
+| **code-quality** | Checks PHP syntax and code structure |
+| **security-check** | Audits dependencies and checks for hardcoded secrets |
+
+### Build Matrix
+
+```yaml
+php-version: ['7.4', '8.0', '8.1', '8.2', '8.3']
+```
+
+### Running Locally
+
+To simulate the CI environment locally:
+
+```bash
+# Syntax check
+find app -name "*.php" -print0 | xargs -0 -n1 php -l
+
+# Security audit
+composer audit
+
+# Run tests
+composer test
+```
+
 ## Contributing
 
 1. Fork the repository
@@ -511,6 +550,13 @@ protected $casts = [
 3. Commit your changes (`git commit -m 'Add amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
+
+### Pull Request Guidelines
+
+- All tests must pass in the CI pipeline
+- Code must work on PHP 7.4+ and 8.x
+- Follow existing code style and conventions
+- Update documentation if adding new features
 
 ## License
 
