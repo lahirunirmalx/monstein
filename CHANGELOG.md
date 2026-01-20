@@ -5,6 +5,19 @@ All notable changes to Monstein API Framework will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] - 2026-01-20
+
+### Security
+- **CRITICAL**: Upgraded `firebase/php-jwt` from ^5.5 to ^6.0 to fix CVE-2021-46743 (Key/algorithm type confusion)
+- Removed abandoned `tuupola/slim-jwt-auth` package
+- Added custom `JwtMiddleware` class for secure JWT handling
+
+### Changed
+- JWT authentication now uses custom middleware (`app/Base/JwtMiddleware.php`)
+- Updated User model for firebase/php-jwt 6.x API compatibility
+
+---
+
 ## [2.0.0] - 2026-01-20
 
 ### Added

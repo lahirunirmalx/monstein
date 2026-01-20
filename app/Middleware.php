@@ -2,6 +2,7 @@
 namespace Monstein;
 
 use Monstein\Base\BaseRouter;
+use Monstein\Base\JwtMiddleware;
 use Monstein\Config\Config;
 
 /**
@@ -73,36 +74,12 @@ class Middleware
         // JWT middleware callbacks are dependent on DB - ensure Eloquent is initialized
         $this->container->get('db');
         
-        $authConfig = Config::auth();
-        
-        $this->app->add(new \Tuupola\Middleware\JwtAuthentication([
-            'attribute' => 'jwt',
-            'path' => ['/'],
+        // Use custom JWT middleware for firebase/php-jwt 6.x compatibility
+        $this->app->add(new JwtMiddleware([
             'ignore' => array_keys(BaseRouter::getInstance()->getIgnorePaths()),
-            'secret' => $authConfig['secret'],
-            'algorithm' => [$authConfig['jwt']],
             'logger' => $this->container['logger'],
-            'secure' => !Config::isDebug(), // Require HTTPS in production
-            'relaxed' => ['localhost', '127.0.0.1'], // Allow HTTP on localhost
-            'error' => function ($response, $arguments) {
-                $data = [
-                    'success' => false,
-                    'errors' => $arguments['message']
-                ];
-                $payload = json_encode($data);
-                $response->getBody()->write($payload);
-                return $response
-                    ->withHeader('Content-Type', 'application/json')
-                    ->withStatus(401);
-            },
-            'before' => function ($request, $arguments) {
-                $userId = $arguments['decoded']['sub'] ?? null;
-                if ($userId === null) {
-                    return $request;
-                }
-                $user = \Monstein\Models\User::find($userId);
-                return $request->withAttribute('user', $user);
-            }
+            'secure' => !Config::isDebug(),
+            'relaxed' => ['localhost', '127.0.0.1'],
         ]));
     }
 }

@@ -19,8 +19,7 @@
         "monolog/monolog": "^2.0 || ^3.0",
         "awurth/slim-validation": "^3.0",
         "robmorgan/phinx": "^0.13 || ^0.14",
-        "tuupola/slim-jwt-auth": "^3.6",
-        "firebase/php-jwt": "^5.5",
+        "firebase/php-jwt": "^6.0",
         "symfony/yaml": "^5.0 || ^6.0",
         "vlucas/phpdotenv": "^5.5"
     },

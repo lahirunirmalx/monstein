@@ -5,6 +5,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Firebase\JWT\JWT;
+use Firebase\JWT\Key;
 use Monstein\Config\Config;
 
 /**
@@ -101,8 +102,8 @@ class User extends Model
     {
         try {
             $authConfig = Config::auth();
-            // firebase/php-jwt v5.x signature
-            return JWT::decode($token, $authConfig['secret'], [$authConfig['jwt']]);
+            // firebase/php-jwt v6.x requires Key object
+            return JWT::decode($token, new Key($authConfig['secret'], $authConfig['jwt']));
         } catch (\Exception $e) {
             return null;
         }
