@@ -14,12 +14,11 @@ $dotenv->safeLoad();
 $driver = $_ENV['DB_DRIVER'] ?? 'mysql';
 
 // Build environment configuration based on driver
-$buildEnvConfig = function($suffix = '') use ($driver) {
+$buildEnvConfig = function() use ($driver) {
+    $dbName = $_ENV['DB_NAME'] ?? '';
+    
     if ($driver === 'sqlite') {
-        $dbPath = $_ENV['DB_NAME'] ?? 'database/monstein.sqlite';
-        if ($suffix) {
-            $dbPath = str_replace('.sqlite', $suffix . '.sqlite', $dbPath);
-        }
+        $dbPath = $dbName ?: 'database/monstein.sqlite';
         if ($dbPath && $dbPath[0] !== '/') {
             $dbPath = __DIR__ . '/' . $dbPath;
         }
@@ -32,13 +31,15 @@ $buildEnvConfig = function($suffix = '') use ($driver) {
     return [
         'adapter' => $driver,
         'host' => $_ENV['DB_HOST'] ?? 'localhost',
-        'name' => ($_ENV['DB_NAME'] ?? '') . $suffix,
+        'name' => $dbName,
         'user' => $_ENV['DB_USER'] ?? '',
         'pass' => $_ENV['DB_PASS'] ?? '',
         'port' => $_ENV['DB_PORT'] ?? '3306',
         'charset' => $_ENV['DB_CHARSET'] ?? 'utf8mb4',
     ];
 };
+
+$envConfig = $buildEnvConfig();
 
 return [
     'paths' => [
@@ -48,10 +49,10 @@ return [
 
     'environments' => [
         'default_migration_table' => 'phinxlog',
-        'default_database' => $_ENV['APP_ENV'] ?? 'development',
-        'production' => $buildEnvConfig(),
-        'development' => $buildEnvConfig(),
-        'testing' => $buildEnvConfig('_test'),
+        'default_environment' => $_ENV['APP_ENV'] ?? 'development',
+        'production' => $envConfig,
+        'development' => $envConfig,
+        'testing' => $envConfig,
     ],
 
     'version_order' => 'creation',

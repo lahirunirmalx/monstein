@@ -90,9 +90,7 @@ jobs:
         done
 
     - name: Run database migrations
-      run: ./vendor/bin/phinx migrate -e testing
-      env:
-        APP_ENV: testing
+      run: ./vendor/bin/phinx migrate
 
     - name: Create test user
       run: |
