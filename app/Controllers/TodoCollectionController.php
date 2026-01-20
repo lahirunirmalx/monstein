@@ -61,7 +61,7 @@ class TodoCollectionController extends CollectionController
 
     public function doGet(Request $request , Response $response , $args , $cleanValues)
     {
-        $this->getLogger()->addInfo('GET /todo');
+        $this->getLogger()->info('GET /todo');
         $user = $request->getAttribute('user');
         $todo = $this->getFilteredTodoList($user,$cleanValues);
         return $response->withJson([

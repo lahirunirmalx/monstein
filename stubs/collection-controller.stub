@@ -1,0 +1,105 @@
+<?php
+
+namespace Monstein\Controllers;
+
+use Monstein\Base\CollectionController;
+use Monstein\Base\HttpCode;
+use Psr\Http\Message\ResponseInterface as Response;
+use Psr\Http\Message\ServerRequestInterface as Request;
+use Respect\Validation\Validator as V;
+
+/**
+ * {{CONTROLLER_NAME}}
+ * 
+ * Handles collection operations (list, create) for {{CLASS_NAME}} resources.
+ * 
+ * Endpoints:
+ *   GET  /{{VARIABLE_NAME}}s     - List all {{VARIABLE_NAME}}s
+ *   POST /{{VARIABLE_NAME}}s     - Create a new {{VARIABLE_NAME}}
+ */
+class {{CONTROLLER_NAME}} extends CollectionController
+{
+    /**
+     * Validation rules for GET requests
+     * 
+     * @return array
+     */
+    public function validateGetRequest(): array
+    {
+        return [
+            'name' => [
+                'rules' => V::optional(V::alnum('-')->noWhitespace()),
+                'message' => 'Invalid name filter'
+            ],
+        ];
+    }
+
+    /**
+     * Validation rules for POST requests
+     * 
+     * @return array
+     */
+    public function validatePostRequest(): array
+    {
+        return [
+            'name' => V::notEmpty()->length(1, 255)->alnum('-'),
+            // Add your validation rules here
+        ];
+    }
+
+    /**
+     * Handle GET request - List all {{VARIABLE_NAME}}s
+     * 
+     * @param Request $request
+     * @param Response $response
+     * @param array $args
+     * @param array $cleanValues
+     * @return Response
+     */
+    public function doGet(Request $request, Response $response, $args, $cleanValues): Response
+    {
+        $this->getLogger()->info('GET /{{VARIABLE_NAME}}s');
+        
+        $user = $request->getAttribute('user');
+        $query = $user->{{VARIABLE_NAME}}s();
+        
+        // Apply filters
+        if (!empty($cleanValues['name'])) {
+            $query->where('name', 'like', '%' . $cleanValues['name'] . '%');
+        }
+        
+        $items = $query->get();
+        
+        return $response->withJson([
+            'success' => true,
+            'data' => $items
+        ], HttpCode::HTTP_OK);
+    }
+
+    /**
+     * Handle POST request - Create a new {{VARIABLE_NAME}}
+     * 
+     * @param Request $request
+     * @param Response $response
+     * @param array $args
+     * @param array $cleanValues
+     * @return Response
+     */
+    public function doPost(Request $request, Response $response, $args, $cleanValues): Response
+    {
+        $this->getLogger()->info('POST /{{VARIABLE_NAME}}s');
+        
+        $user = $request->getAttribute('user');
+        
+        // Create new {{VARIABLE_NAME}}
+        ${{VARIABLE_NAME}} = $user->{{VARIABLE_NAME}}s()->create([
+            'name' => $cleanValues['name'],
+            // Add your fields here
+        ]);
+        
+        return $response->withJson([
+            'success' => true,
+            'id' => ${{VARIABLE_NAME}}->id
+        ], HttpCode::HTTP_CREATED);
+    }
+}

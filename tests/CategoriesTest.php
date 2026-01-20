@@ -1,170 +1,214 @@
 <?php
-use App\App;
-use Slim\Http\Environment;
-use Slim\Http\Request;
-use App\Models\Category as Category;
-require_once('Helper.php');
 
-class CategoriesTest extends \PHPUnit\Framework\TestCase {
-    
+namespace Monstein\Tests;
+
+use Monstein\App;
+use Monstein\Models\Category;
+use PHPUnit\Framework\TestCase;
+
+class CategoriesTest extends TestCase
+{
+    /** @var \Slim\App */
     protected $app;
+
+    /** @var Helper */
     private $helper;
+
+    /** @var string */
     private $token;
-    
-    public function setUp() {
-        $this->app = (new App)->get();
+
+    protected function setUp(): void
+    {
+        $this->app = (new App())->get();
         $this->helper = new Helper($this->app);
         $this->token = $this->helper->getAuthToken();
     }
-    
-    public function testCategoriesNoAuthGet() {
+
+    public function testCategoriesNoAuthGet(): void
+    {
         $data = $this->helper->apiTest('get', '/categories');
-        $this->assertSame($data['code'], 401);
+        $this->assertSame(401, $data['code']);
     }
-    
-    public function testCategoriesGet() {
+
+    public function testCategoriesGet(): void
+    {
         $data = $this->helper->apiTest('get', '/categories', $this->token);
-        $this->assertSame($data['code'], 200);
+        $this->assertSame(200, $data['code']);
     }
-    
-    public function dataCategoriesInvalidPost() {
+
+    /**
+     * @return array<array<string>>
+     */
+    public function dataCategoriesInvalidPost(): array
+    {
         return [
-            ['PHPUnit #$W@@$ '.time()], // symbols
+            ['PHPUnit #$W@@$ ' . time()], // symbols
             ['a'], // too short
             ['abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz'] // too long
         ];
     }
+
     /**
      * @dataProvider dataCategoriesInvalidPost
      */
-    public function testCategoriesInvalidPost($name) {
+    public function testCategoriesInvalidPost(string $name): void
+    {
         $data = $this->helper->apiTest('post', '/categories', $this->token, [
             'name' => $name
         ]);
-        $this->assertSame($data['code'], 400);
+        $this->assertSame(400, $data['code']);
         $this->assertFalse($data['data']['success']);
     }
-    
-    public function testCategoriesPost() {
+
+    public function testCategoriesPost(): int
+    {
         $data = $this->helper->apiTest('post', '/categories', $this->token, [
             'name' => 'PHPUnit'
         ]);
-        $this->assertSame($data['code'], 200);
+        $this->assertSame(200, $data['code']);
         $this->assertTrue($data['data']['success']);
         return $data['data']['id'];
     }
-    
+
     /**
      * @depends testCategoriesPost
      */
-    public function testCategoriesUserRelationship($categoryId) {
+    public function testCategoriesUserRelationship(int $categoryId): void
+    {
         $category = Category::find($categoryId);
         $this->assertTrue(is_numeric($category->user->id));
     }
-    
-    public function testCategoriesPostDuplicate() {
+
+    public function testCategoriesPostDuplicate(): void
+    {
         $data = $this->helper->apiTest('post', '/categories', $this->token, [
             'name' => 'PHPUnit2'
         ]);
-        $this->assertSame($data['code'], 200);
+        $this->assertSame(200, $data['code']);
         $this->assertTrue($data['data']['success']);
     }
-    
-    public function dataCategoriesInvalidIdGet() {
+
+    /**
+     * @return array<array<mixed>>
+     */
+    public function dataCategoriesInvalidIdGet(): array
+    {
         return [
             ['stringID'], // non-numeric
             [-10], // negative
             [9999] // invalid
         ];
     }
+
     /**
      * @dataProvider dataCategoriesInvalidIdGet
+     * @param mixed $categoryId
      */
-    public function testCategoriesInvalidIdGet($categoryId) {
-        $data = $this->helper->apiTest('get', '/categories/'.$categoryId, $this->token);
-        $this->assertSame($data['code'], 400);
+    public function testCategoriesInvalidIdGet($categoryId): void
+    {
+        $data = $this->helper->apiTest('get', '/category/' . $categoryId, $this->token);
+        $this->assertSame(400, $data['code']);
         $this->assertFalse($data['data']['success']);
     }
-    
+
     /**
      * @depends testCategoriesPost
      */
-    public function testCategoriesIdGet($categoryId) {
-        $data = $this->helper->apiTest('get', '/categories/'.$categoryId, $this->token);
-        $this->assertSame($data['code'], 200);
-        $this->assertSame($data['data']['data']['id'], $categoryId);
+    public function testCategoriesIdGet(int $categoryId): void
+    {
+        $data = $this->helper->apiTest('get', '/category/' . $categoryId, $this->token);
+        $this->assertSame(200, $data['code']);
+        $this->assertSame($categoryId, $data['data']['data']['id']);
     }
-    
+
     /**
      * @depends testCategoriesPost
      */
-    public function testCategoriesTodosGet($categoryId) {
-        $data = $this->helper->apiTest('get', '/categories/'.$categoryId.'/todos', $this->token);
-        $this->assertSame($data['code'], 200);
+    public function testCategoriesTodosGet(int $categoryId): void
+    {
+        $data = $this->helper->apiTest('get', '/category/' . $categoryId . '/todos', $this->token);
+        $this->assertSame(200, $data['code']);
         $this->assertTrue(is_array($data['data']['data']));
     }
-    
-    public function dataCategoriesPutInvalid() {
+
+    /**
+     * @return array<array<mixed>>
+     */
+    public function dataCategoriesPutInvalid(): array
+    {
         return [
-            [null, 'PHPUnit #$W@@$ '.time()], // symbols
+            [null, 'PHPUnit #$W@@$ ' . time()], // symbols
             [null, 'a'], // too short
             [null, 'abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz'], // too long
             [9999, 'testing'], // invalid category
-            [null, 'PHPUnit2'] // duplicate name (created in testCategoriesPostDuplicate method above)
+            [null, 'PHPUnit2'] // duplicate name
         ];
     }
+
     /**
      * @dataProvider dataCategoriesPutInvalid
      * @depends testCategoriesPost
+     * @param int|null $overwriteCategory
      */
-    public function testCategoriesPutInvalid($overwiteCategory, $name, $categoryId) {
-        $categoryId = $overwiteCategory ? $overwiteCategory : $categoryId;
-        $data = $this->helper->apiTest('put', '/categories/'.$categoryId, $this->token, ['name' => $name]);
-        $this->assertSame($data['code'], 400);
+    public function testCategoriesPutInvalid($overwriteCategory, string $name, int $categoryId): void
+    {
+        $categoryId = $overwriteCategory ? $overwriteCategory : $categoryId;
+        $data = $this->helper->apiTest('put', '/category/' . $categoryId, $this->token, ['name' => $name]);
+        $this->assertSame(400, $data['code']);
         $this->assertFalse($data['data']['success']);
     }
-    
+
     /**
      * @depends testCategoriesPost
      */
-    public function testCategoriesPut($categoryId) {
-        $data = $this->helper->apiTest('put', '/categories/'.$categoryId, $this->token, [
-            'name' => 'PHPUnit U '.time()
+    public function testCategoriesPut(int $categoryId): void
+    {
+        $data = $this->helper->apiTest('put', '/category/' . $categoryId, $this->token, [
+            'name' => 'PHPUnit U ' . time()
         ]);
-        $this->assertSame($data['code'], 200);
+        $this->assertSame(200, $data['code']);
         $this->assertTrue($data['data']['success']);
     }
-    
-    public function dataCategoriesDeleteInvalid() {
+
+    /**
+     * @return array<array<mixed>>
+     */
+    public function dataCategoriesDeleteInvalid(): array
+    {
         return [
             ['IDasString'], // string
             [99999] // invalid
         ];
     }
+
     /**
      * @dataProvider dataCategoriesDeleteInvalid
+     * @param mixed $categoryId
      */
-    public function testCategoriesDeleteInvalid($categoryId) {
-        $data = $this->helper->apiTest('delete', '/categories/'.$categoryId, $this->token);
-        $this->assertSame($data['code'], 400);
+    public function testCategoriesDeleteInvalid($categoryId): void
+    {
+        $data = $this->helper->apiTest('delete', '/category/' . $categoryId, $this->token);
+        $this->assertSame(400, $data['code']);
         $this->assertFalse($data['data']['success']);
     }
-    
+
     /**
      * @depends testCategoriesPost
      */
-    public function testCategoriesDeleteSoft($categoryId) {
-        $data = $this->helper->apiTest('delete', '/categories/'.$categoryId, $this->token);
-        $this->assertSame($data['code'], 200);
+    public function testCategoriesDeleteSoft(int $categoryId): void
+    {
+        $data = $this->helper->apiTest('delete', '/category/' . $categoryId, $this->token);
+        $this->assertSame(200, $data['code']);
         $this->assertTrue($data['data']['success']);
     }
-    
+
     /**
      * @depends testCategoriesPost
      */
-    public function testCategoriesDeleteForce($categoryId) {
-        $data = $this->helper->apiTest('delete', '/categories/'.$categoryId, $this->token, ['force' => true]);
-        $this->assertSame($data['code'], 200);
+    public function testCategoriesDeleteForce(int $categoryId): void
+    {
+        $data = $this->helper->apiTest('delete', '/category/' . $categoryId, $this->token, ['force' => true]);
+        $this->assertSame(200, $data['code']);
         $this->assertTrue($data['data']['success']);
     }
 }

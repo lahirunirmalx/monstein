@@ -3,23 +3,78 @@ namespace Monstein\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Events\Dispatcher;
 
-class Category extends Model {
-    use SoftDeletes; // toggle soft deletes
+/**
+ * Category model for organizing todos
+ * 
+ * @property int $id
+ * @property int $user_id
+ * @property string $name
+ * @property \DateTime $created_at
+ * @property \DateTime $updated_at
+ * @property \DateTime|null $deleted_at
+ */
+class Category extends Model
+{
+    use SoftDeletes;
+
+    /** @var string */
     protected $table = 'categories';
-    protected $fillable = ['user_id', 'name']; // for mass creation
-    protected $hidden = ['deleted_at']; // hidden columns from select results
-    protected $dates = ['deleted_at']; // the attributes that should be mutated to dates
-    public static function boot() {
+
+    /** @var array<string> */
+    protected $fillable = ['user_id', 'name'];
+
+    /** @var array<string> */
+    protected $hidden = ['deleted_at'];
+
+    /** @var array<string> */
+    protected $dates = ['deleted_at'];
+
+    /**
+     * Boot the model
+     * 
+     * @return void
+     */
+    protected static function boot(): void
+    {
         parent::boot();
-        // setup model event listeners
-        static::setEventDispatcher(new \Illuminate\Events\Dispatcher());
-        static::deleting(['\Monstein\Models\Events\Category', 'delete']); // DELETE event listener
+
+        // Setup model event listeners
+        static::setEventDispatcher(new Dispatcher());
+
+        // Cascade soft deletes to todos when category is deleted
+        static::deleting(function (Category $category) {
+            if (!$category->isForceDeleting()) {
+                $category->todos()->delete();
+            }
+        });
+
+        // Cascade force deletes to todos
+        static::forceDeleting(function (Category $category) {
+            $category->todos()->forceDelete();
+        });
     }
-    public function user() {
-        return $this->belongsTo('\Monstein\Models\User');
+
+    /**
+     * Get the user that owns the category
+     * 
+     * @return BelongsTo
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
-    public function todos() {
-        return $this->hasMany('\Monstein\Models\Todo', 'category_id');
+
+    /**
+     * Get the todos for the category
+     * 
+     * @return HasMany
+     */
+    public function todos(): HasMany
+    {
+        return $this->hasMany(Todo::class, 'category_id');
     }
 }

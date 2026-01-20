@@ -3,34 +3,108 @@ namespace Monstein\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Firebase\JWT\JWT;
+use Monstein\Config\Config;
 
-class User extends Model {
-    use SoftDeletes; // toggle soft deletes
+/**
+ * User model with authentication capabilities
+ * 
+ * @property int $id
+ * @property string $username
+ * @property string $password
+ * @property \DateTime $created_at
+ * @property \DateTime $updated_at
+ * @property \DateTime|null $deleted_at
+ */
+class User extends Model
+{
+    use SoftDeletes;
+
+    /** @var string */
     protected $table = 'users';
-    protected $fillable = ['username', 'password']; // for mass creation
-    protected $hidden = ['password', 'deleted_at']; // hidden columns from select results
-    protected $dates = ['deleted_at']; // the attributes that should be mutated to dates
-    public function categories() {
-        return $this->hasMany('\Monstein\Models\Category', 'user_id');
+
+    /** @var array<string> */
+    protected $fillable = ['username', 'password'];
+
+    /** @var array<string> */
+    protected $hidden = ['password', 'deleted_at'];
+
+    /** @var array<string> */
+    protected $dates = ['deleted_at'];
+
+    /**
+     * Get the categories for the user
+     * 
+     * @return HasMany
+     */
+    public function categories(): HasMany
+    {
+        return $this->hasMany(Category::class, 'user_id');
     }
-    public function todos() {
-        return $this->hasMany('\Monstein\Models\Todo', 'user_id');
+
+    /**
+     * Get the todos for the user
+     * 
+     * @return HasMany
+     */
+    public function todos(): HasMany
+    {
+        return $this->hasMany(Todo::class, 'user_id');
     }
-    public function setPasswordAttribute($pass){
-        $this->attributes['password'] = password_hash($pass, \Monstein\Config\Config::auth()['hash']);
+
+    /**
+     * Hash the password before storing
+     * 
+     * @param string $pass Plain text password
+     * @return void
+     */
+    public function setPasswordAttribute(string $pass): void
+    {
+        $this->attributes['password'] = password_hash($pass, Config::auth()['hash']);
     }
-    public function tokenCreate() {
-        $expires = new \DateTime("+".(\Monstein\Config\Config::auth()['expires'])." minutes"); // token expiration
+
+    /**
+     * Create a JWT token for the user
+     * 
+     * @return array{token: string, expires: int}
+     */
+    public function tokenCreate(): array
+    {
+        $authConfig = Config::auth();
+        $now = new \DateTime();
+        $expires = new \DateTime('+' . $authConfig['expires'] . ' minutes');
+
         $payload = [
-            "iat" => (new \DateTime())->getTimeStamp(), // initalized unix timestamp
-            "exp" => $expires->getTimeStamp(), // expiration unix timestamp
-            "sub" => $this->id // internal user identifier
+            'iat' => $now->getTimestamp(),      // Issued at
+            'exp' => $expires->getTimestamp(),  // Expiration
+            'sub' => $this->id,                  // Subject (user ID)
+            'jti' => bin2hex(random_bytes(16))  // Unique token ID
         ];
-        $token = JWT::encode($payload, \Monstein\Config\Config::auth()['secret'], \Monstein\Config\Config::auth()['jwt']);
+
+        // firebase/php-jwt v6 requires explicit algorithm parameter
+        $token = JWT::encode($payload, $authConfig['secret'], $authConfig['jwt']);
+
         return [
             'token' => $token,
             'expires' => $expires->getTimestamp()
         ];
+    }
+
+    /**
+     * Verify a JWT token and return the decoded payload
+     * 
+     * @param string $token JWT token
+     * @return object|null Decoded payload or null if invalid
+     */
+    public static function tokenVerify(string $token): ?object
+    {
+        try {
+            $authConfig = Config::auth();
+            // firebase/php-jwt v5.x signature
+            return JWT::decode($token, $authConfig['secret'], [$authConfig['jwt']]);
+        } catch (\Exception $e) {
+            return null;
+        }
     }
 }

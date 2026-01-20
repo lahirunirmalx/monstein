@@ -1,0 +1,54 @@
+<?php
+
+namespace Monstein\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+/**
+ * {{CLASS_NAME}} Model
+ * 
+ * @property int $id
+ * @property int $user_id
+ * @property string $name
+ * @property \DateTime $created_at
+ * @property \DateTime $updated_at
+ * @property \DateTime|null $deleted_at
+ */
+class {{CLASS_NAME}} extends Model
+{
+    use SoftDeletes;
+
+    /** @var string */
+    protected $table = '{{TABLE_NAME}}';
+
+    /** @var array<string> Fields allowed for mass assignment */
+    protected $fillable = [
+        'user_id',
+        'name',
+        // Add your fillable fields here
+    ];
+
+    /** @var array<string> Fields hidden from JSON serialization */
+    protected $hidden = [
+        'deleted_at',
+    ];
+
+    /** @var array<string> Date fields */
+    protected $dates = [
+        'deleted_at',
+    ];
+
+    /**
+     * Get the user that owns the {{CLASS_NAME}}
+     * 
+     * @return BelongsTo
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'user_id');
+    }
+
+    // Add your relationships and methods here
+}

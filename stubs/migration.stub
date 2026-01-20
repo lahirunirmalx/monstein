@@ -1,0 +1,30 @@
+<?php
+
+use Phinx\Migration\AbstractMigration;
+
+class {{CLASS_NAME}} extends AbstractMigration
+{
+    /**
+     * Create the {{TABLE_NAME}} table
+     */
+    public function change(): void
+    {
+        $table = $this->table('{{TABLE_NAME}}');
+        
+        $table
+            ->addColumn('user_id', 'integer', ['signed' => false])
+            ->addColumn('name', 'string', ['limit' => 255])
+            // Add your columns here
+            // Examples:
+            // ->addColumn('description', 'text', ['null' => true])
+            // ->addColumn('status', 'enum', ['values' => ['active', 'inactive'], 'default' => 'active'])
+            // ->addColumn('priority', 'integer', ['default' => 0])
+            // ->addColumn('is_completed', 'boolean', ['default' => false])
+            ->addColumn('created_at', 'datetime', ['null' => true])
+            ->addColumn('updated_at', 'datetime', ['null' => true])
+            ->addColumn('deleted_at', 'datetime', ['null' => true])
+            ->addIndex(['user_id'])
+            ->addForeignKey('user_id', 'users', 'id', ['delete' => 'CASCADE'])
+            ->create();
+    }
+}

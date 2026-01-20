@@ -1,0 +1,362 @@
+#!/usr/bin/env php
+<?php
+/**
+ * Monstein CLI Tool
+ * 
+ * Developer tools for scaffolding new entities, controllers, and endpoints.
+ * 
+ * Usage:
+ *   ./bin/monstein make:entity <EntityName>
+ *   ./bin/monstein make:controller <ControllerName>
+ *   ./bin/monstein make:resource <ResourceName>
+ *   ./bin/monstein make:migration <MigrationName>
+ */
+
+// Color codes for terminal output
+define('COLOR_GREEN', "\033[32m");
+define('COLOR_YELLOW', "\033[33m");
+define('COLOR_RED', "\033[31m");
+define('COLOR_CYAN', "\033[36m");
+define('COLOR_RESET', "\033[0m");
+
+// Base paths
+define('BASE_PATH', dirname(__DIR__));
+define('APP_PATH', BASE_PATH . '/app');
+define('STUBS_PATH', BASE_PATH . '/stubs');
+define('MIGRATIONS_PATH', BASE_PATH . '/db/migrations');
+
+/**
+ * Print colored output
+ */
+function output(string $message, string $color = ''): void
+{
+    echo $color . $message . COLOR_RESET . PHP_EOL;
+}
+
+/**
+ * Print success message
+ */
+function success(string $message): void
+{
+    output("✓ " . $message, COLOR_GREEN);
+}
+
+/**
+ * Print error message
+ */
+function error(string $message): void
+{
+    output("✗ " . $message, COLOR_RED);
+}
+
+/**
+ * Print info message
+ */
+function info(string $message): void
+{
+    output("→ " . $message, COLOR_CYAN);
+}
+
+/**
+ * Print warning message
+ */
+function warning(string $message): void
+{
+    output("⚠ " . $message, COLOR_YELLOW);
+}
+
+/**
+ * Convert string to StudlyCase
+ */
+function studly(string $value): string
+{
+    return str_replace(' ', '', ucwords(str_replace(['-', '_'], ' ', $value)));
+}
+
+/**
+ * Convert string to snake_case
+ */
+function snake(string $value): string
+{
+    return strtolower(preg_replace('/(?<!^)[A-Z]/', '_$0', $value));
+}
+
+/**
+ * Convert string to plural form (simple)
+ */
+function pluralize(string $value): string
+{
+    $lastChar = strtolower(substr($value, -1));
+    $lastTwoChars = strtolower(substr($value, -2));
+    
+    if ($lastTwoChars === 'ey') {
+        return $value . 's';
+    }
+    if ($lastChar === 'y') {
+        return substr($value, 0, -1) . 'ies';
+    }
+    if ($lastChar === 's' || $lastTwoChars === 'ch' || $lastTwoChars === 'sh') {
+        return $value . 'es';
+    }
+    return $value . 's';
+}
+
+/**
+ * Load stub file and replace placeholders
+ */
+function loadStub(string $stubName, array $replacements): string
+{
+    $stubPath = STUBS_PATH . '/' . $stubName . '.stub';
+    
+    if (!file_exists($stubPath)) {
+        throw new RuntimeException("Stub file not found: {$stubPath}");
+    }
+    
+    $content = file_get_contents($stubPath);
+    
+    foreach ($replacements as $key => $value) {
+        $content = str_replace('{{' . $key . '}}', $value, $content);
+    }
+    
+    return $content;
+}
+
+/**
+ * Write file with directory creation
+ */
+function writeFile(string $path, string $content): bool
+{
+    $dir = dirname($path);
+    if (!is_dir($dir)) {
+        mkdir($dir, 0755, true);
+    }
+    
+    if (file_exists($path)) {
+        warning("File already exists: {$path}");
+        return false;
+    }
+    
+    return file_put_contents($path, $content) !== false;
+}
+
+/**
+ * Make Entity (Model)
+ */
+function makeEntity(string $name): void
+{
+    $className = studly($name);
+    $tableName = snake(pluralize($className));
+    
+    $replacements = [
+        'CLASS_NAME' => $className,
+        'TABLE_NAME' => $tableName,
+    ];
+    
+    $content = loadStub('model', $replacements);
+    $path = APP_PATH . '/Models/' . $className . '.php';
+    
+    if (writeFile($path, $content)) {
+        success("Created Model: app/Models/{$className}.php");
+    }
+}
+
+/**
+ * Make Collection Controller
+ */
+function makeCollectionController(string $name): void
+{
+    $className = studly($name);
+    $controllerName = $className . 'CollectionController';
+    $variableName = lcfirst($className);
+    
+    $replacements = [
+        'CLASS_NAME' => $className,
+        'CONTROLLER_NAME' => $controllerName,
+        'VARIABLE_NAME' => $variableName,
+    ];
+    
+    $content = loadStub('collection-controller', $replacements);
+    $path = APP_PATH . '/Controllers/' . $controllerName . '.php';
+    
+    if (writeFile($path, $content)) {
+        success("Created Controller: app/Controllers/{$controllerName}.php");
+    }
+}
+
+/**
+ * Make Entity Controller
+ */
+function makeEntityController(string $name): void
+{
+    $className = studly($name);
+    $controllerName = $className . 'EntityController';
+    $variableName = lcfirst($className);
+    
+    $replacements = [
+        'CLASS_NAME' => $className,
+        'CONTROLLER_NAME' => $controllerName,
+        'VARIABLE_NAME' => $variableName,
+    ];
+    
+    $content = loadStub('entity-controller', $replacements);
+    $path = APP_PATH . '/Controllers/' . $controllerName . '.php';
+    
+    if (writeFile($path, $content)) {
+        success("Created Controller: app/Controllers/{$controllerName}.php");
+    }
+}
+
+/**
+ * Make Migration
+ */
+function makeMigration(string $name): void
+{
+    $className = 'Create' . studly(pluralize($name)) . 'Table';
+    $tableName = snake(pluralize($name));
+    $timestamp = date('YmdHis');
+    $fileName = $timestamp . '_' . snake($className) . '.php';
+    
+    $replacements = [
+        'CLASS_NAME' => $className,
+        'TABLE_NAME' => $tableName,
+    ];
+    
+    $content = loadStub('migration', $replacements);
+    $path = MIGRATIONS_PATH . '/' . $fileName;
+    
+    if (writeFile($path, $content)) {
+        success("Created Migration: db/migrations/{$fileName}");
+    }
+}
+
+/**
+ * Generate route configuration
+ */
+function generateRouteConfig(string $name): string
+{
+    $className = studly($name);
+    $routeName = strtolower($name);
+    $routeNamePlural = strtolower(pluralize($name));
+    
+    return <<<YAML
+# Add these routes to app/Config/routing.yml
+
+{$routeNamePlural}:
+  url: /{$routeNamePlural}
+  controller: \Monstein\Controllers\\{$className}CollectionController
+  method: [ post, get ]
+
+{$routeName}:
+  url: /{$routeName}/{id}
+  controller: \Monstein\Controllers\\{$className}EntityController
+  method: [ put, get, delete ]
+YAML;
+}
+
+/**
+ * Make full resource (model + controllers + migration + routes)
+ */
+function makeResource(string $name): void
+{
+    output("\nCreating resource: " . studly($name), COLOR_CYAN);
+    output(str_repeat('-', 50));
+    
+    makeEntity($name);
+    makeCollectionController($name);
+    makeEntityController($name);
+    makeMigration($name);
+    
+    output("\n" . str_repeat('-', 50));
+    info("Add the following to app/Config/routing.yml:\n");
+    echo generateRouteConfig($name) . "\n\n";
+    
+    info("Run migration with: ./vendor/bin/phinx migrate");
+    output("");
+}
+
+/**
+ * Show help
+ */
+function showHelp(): void
+{
+    echo <<<HELP
+
+\033[36m╔══════════════════════════════════════════════════════════════╗
+║                    MONSTEIN CLI TOOL                          ║
+╚══════════════════════════════════════════════════════════════╝\033[0m
+
+\033[33mUsage:\033[0m
+  ./bin/monstein <command> <name>
+
+\033[33mCommands:\033[0m
+  \033[32mmake:resource\033[0m <Name>     Create full resource (model, controllers, migration)
+  \033[32mmake:entity\033[0m <Name>       Create a new Eloquent model
+  \033[32mmake:controller\033[0m <Name>   Create collection and entity controllers
+  \033[32mmake:migration\033[0m <Name>    Create a new Phinx migration
+
+\033[33mExamples:\033[0m
+  ./bin/monstein make:resource Project
+  ./bin/monstein make:entity Task
+  ./bin/monstein make:controller Comment
+  ./bin/monstein make:migration Tag
+
+\033[33mNaming Convention:\033[0m
+  - Use singular, StudlyCase names (e.g., Project, TaskItem)
+  - Table names will be auto-generated as snake_case plural (e.g., projects, task_items)
+
+
+HELP;
+}
+
+// ============================================================================
+// MAIN EXECUTION
+// ============================================================================
+
+if ($argc < 2) {
+    showHelp();
+    exit(0);
+}
+
+$command = $argv[1] ?? '';
+$name = $argv[2] ?? '';
+
+if (empty($name) && $command !== 'help' && $command !== '--help' && $command !== '-h') {
+    error("Missing name argument");
+    showHelp();
+    exit(1);
+}
+
+try {
+    switch ($command) {
+        case 'make:resource':
+            makeResource($name);
+            break;
+            
+        case 'make:entity':
+            makeEntity($name);
+            break;
+            
+        case 'make:controller':
+            makeCollectionController($name);
+            makeEntityController($name);
+            break;
+            
+        case 'make:migration':
+            makeMigration($name);
+            break;
+            
+        case 'help':
+        case '--help':
+        case '-h':
+            showHelp();
+            break;
+            
+        default:
+            error("Unknown command: {$command}");
+            showHelp();
+            exit(1);
+    }
+} catch (Exception $e) {
+    error($e->getMessage());
+    exit(1);
+}

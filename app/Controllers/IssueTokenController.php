@@ -11,7 +11,7 @@ class IssueTokenController extends BaseController {
 
 
     public function doPost(Request $request, Response $response,$args,$cleanValues) {
-        $this->getLogger()->addInfo('POST /users/login');
+        $this->getLogger()->info('POST /users/login');
         $data = $cleanValues;
         $errors = [];
 

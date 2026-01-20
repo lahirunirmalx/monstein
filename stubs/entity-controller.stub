@@ -1,0 +1,146 @@
+<?php
+
+namespace Monstein\Controllers;
+
+use Monstein\Base\EntityController;
+use Monstein\Base\HttpCode;
+use Psr\Http\Message\ResponseInterface as Response;
+use Psr\Http\Message\ServerRequestInterface as Request;
+use Respect\Validation\Validator as V;
+
+/**
+ * {{CONTROLLER_NAME}}
+ * 
+ * Handles single entity operations (get, update, delete) for {{CLASS_NAME}} resources.
+ * 
+ * Endpoints:
+ *   GET    /{{VARIABLE_NAME}}/{id}  - Get single {{VARIABLE_NAME}}
+ *   PUT    /{{VARIABLE_NAME}}/{id}  - Update {{VARIABLE_NAME}}
+ *   DELETE /{{VARIABLE_NAME}}/{id}  - Delete {{VARIABLE_NAME}}
+ */
+class {{CONTROLLER_NAME}} extends EntityController
+{
+    /**
+     * Validation rules for GET requests
+     * 
+     * @return array
+     */
+    public function validateGetRequest(): array
+    {
+        return [
+            'id' => V::numeric()->positive(),
+        ];
+    }
+
+    /**
+     * Validation rules for PUT requests
+     * 
+     * @return array
+     */
+    public function validatePutRequest(): array
+    {
+        return [
+            'id' => V::numeric()->positive(),
+            'name' => [
+                'rules' => V::optional(V::length(1, 255)->alnum('-')),
+                'message' => 'Invalid name'
+            ],
+            // Add your validation rules here
+        ];
+    }
+
+    /**
+     * Validation rules for DELETE requests
+     * 
+     * @return array
+     */
+    public function validateDeleteRequest(): array
+    {
+        return [
+            'id' => V::numeric()->positive(),
+            'force' => V::optional(V::boolType()),
+        ];
+    }
+
+    /**
+     * Handle GET request - Get single {{VARIABLE_NAME}}
+     * 
+     * @param Request $request
+     * @param Response $response
+     * @param array $args
+     * @param array $cleanValues
+     * @return Response
+     */
+    public function doGet(Request $request, Response $response, $args, $cleanValues): Response
+    {
+        $user = $request->getAttribute('user');
+        ${{VARIABLE_NAME}} = $user->{{VARIABLE_NAME}}s()->find($cleanValues['id']);
+        
+        if (!${{VARIABLE_NAME}}) {
+            return $this->handleValidationFail(['{{CLASS_NAME}} not found'], $response);
+        }
+        
+        return $response->withJson([
+            'success' => true,
+            'data' => ${{VARIABLE_NAME}}
+        ], HttpCode::HTTP_OK);
+    }
+
+    /**
+     * Handle PUT request - Update {{VARIABLE_NAME}}
+     * 
+     * @param Request $request
+     * @param Response $response
+     * @param array $args
+     * @param array $cleanValues
+     * @return Response
+     */
+    public function doPut(Request $request, Response $response, $args, $cleanValues): Response
+    {
+        $user = $request->getAttribute('user');
+        ${{VARIABLE_NAME}} = $user->{{VARIABLE_NAME}}s()->find($cleanValues['id']);
+        
+        if (!${{VARIABLE_NAME}}) {
+            return $this->handleValidationFail(['{{CLASS_NAME}} not found'], $response);
+        }
+        
+        // Update fields
+        if (isset($cleanValues['name'])) {
+            ${{VARIABLE_NAME}}->name = $cleanValues['name'];
+        }
+        // Add your update logic here
+        
+        ${{VARIABLE_NAME}}->save();
+        
+        return $response->withJson([
+            'success' => true
+        ], HttpCode::HTTP_OK);
+    }
+
+    /**
+     * Handle DELETE request - Delete {{VARIABLE_NAME}}
+     * 
+     * @param Request $request
+     * @param Response $response
+     * @param array $args
+     * @param array $cleanValues
+     * @return Response
+     */
+    public function doDelete(Request $request, Response $response, $args, $cleanValues): Response
+    {
+        $user = $request->getAttribute('user');
+        ${{VARIABLE_NAME}} = $user->{{VARIABLE_NAME}}s()->withTrashed()->find($cleanValues['id']);
+        
+        if (!${{VARIABLE_NAME}}) {
+            return $this->handleValidationFail(['{{CLASS_NAME}} not found'], $response);
+        }
+        
+        // Force delete or soft delete
+        $forceDelete = isset($cleanValues['force']) && $cleanValues['force'];
+        $forceDelete ? ${{VARIABLE_NAME}}->forceDelete() : ${{VARIABLE_NAME}}->delete();
+        
+        return $response->withJson([
+            'success' => true
+        ], HttpCode::HTTP_OK);
+    }
+}

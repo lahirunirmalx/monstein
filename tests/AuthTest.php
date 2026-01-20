@@ -1,25 +1,35 @@
 <?php
-use App\App;
-use Slim\Http\Environment;
-use Slim\Http\Request;
-use App\Models\User as User;
-require_once('Helper.php');
 
-class AuthTest extends \PHPUnit\Framework\TestCase {
-    
+namespace Monstein\Tests;
+
+use Monstein\App;
+use Monstein\Models\User;
+use PHPUnit\Framework\TestCase;
+
+class AuthTest extends TestCase
+{
+    /** @var \Slim\App */
     protected $app;
+
+    /** @var Helper */
     private $helper;
-    
-    public function setUp() {
-        $this->app = (new App)->get();
+
+    protected function setUp(): void
+    {
+        $this->app = (new App())->get();
         $this->helper = new Helper($this->app);
-        // delete user if exists
+
+        // Delete user if exists
         if ($user = User::where('username', 'phpunit')->first()) {
             $user->forceDelete();
         }
     }
-    
-    public function dataUsersInvalidPost() {
+
+    /**
+     * @return array<array<string>>
+     */
+    public function dataUsersInvalidPost(): array
+    {
         return [
             ['phpunit$$%@', 'Testing123'], // user has symbols
             ['a', 'Testing123'], // user too short
@@ -28,32 +38,40 @@ class AuthTest extends \PHPUnit\Framework\TestCase {
             ['phpunittt', 'abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz'], // pass too long
         ];
     }
+
     /**
      * @dataProvider dataUsersInvalidPost
      */
-    public function testUsersInvalidPost($username, $password) {
+    public function testUsersInvalidPost(string $username, string $password): void
+    {
         $data = $this->helper->apiTest('post', '/users', false, ['username' => $username, 'password' => $password]);
-        $this->assertSame($data['code'], 400);
+        $this->assertSame(400, $data['code']);
         $this->assertFalse($data['data']['success']);
     }
-    
-    public function testUsersPost() {
+
+    public function testUsersPost(): int
+    {
         $data = $this->helper->apiTest('post', '/users', false, ['username' => 'phpunit', 'password' => 'phpunit']);
-        $this->assertSame($data['code'], 200);
+        $this->assertSame(200, $data['code']);
         $this->assertTrue($data['data']['success']);
         return $data['data']['id'];
     }
-    
+
     /**
      * @depends testUsersPost
      */
-    public function testUsersDuplicatePost($userId) {
+    public function testUsersDuplicatePost(int $userId): void
+    {
         $this->helper->getAuthToken(); // make sure phpunit user created
         $data = $this->helper->apiTest('post', '/users', false, ['username' => 'phpunit', 'password' => 'phpunit']);
-        $this->assertSame($data['code'], 400);
+        $this->assertSame(400, $data['code']);
     }
-    
-    public function dataUsersLoginInvalidPost() {
+
+    /**
+     * @return array<array<string>>
+     */
+    public function dataUsersLoginInvalidPost(): array
+    {
         return [
             ['phpunit$$%@', 'Testing123'], // user has symbols
             ['a', 'Testing123'], // user too short
@@ -64,24 +82,28 @@ class AuthTest extends \PHPUnit\Framework\TestCase {
             ['phpunit', 'InvalidTesting123'] // user valid, invalid password
         ];
     }
+
     /**
      * @dataProvider dataUsersLoginInvalidPost
      */
-    public function testUsersLoginInvalidPost($username, $password) {
+    public function testUsersLoginInvalidPost(string $username, string $password): void
+    {
         $this->helper->getAuthToken(); // make sure phpunit user created
-        $data = $this->helper->apiTest('post', '/users/login', false, ['username' => $username, 'password' => $password]);
-        $this->assertSame($data['code'], 400);
+        $data = $this->helper->apiTest('post', '/issueToken', false, ['username' => $username, 'password' => $password]);
+        $this->assertSame(400, $data['code']);
         $this->assertFalse($data['data']['success']);
     }
-    
-    public function testUsersLoginPost() {
+
+    public function testUsersLoginPost(): void
+    {
         $this->helper->getAuthToken(); // make sure phpunit user created
-        $data = $this->helper->apiTest('post', '/users/login', false, ['username' => 'phpunit', 'password' => 'phpunit']);
-        $this->assertSame($data['code'], 200);
+        $data = $this->helper->apiTest('post', '/issueToken', false, ['username' => 'phpunit', 'password' => 'phpunit']);
+        $this->assertSame(200, $data['code']);
         $this->assertTrue($data['data']['success']);
     }
-    
-    public function tearDown() {
-        
+
+    protected function tearDown(): void
+    {
+        // Cleanup if needed
     }
 }
