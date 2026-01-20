@@ -7,7 +7,7 @@ class InitMigration extends AbstractMigration
     public function change()
     {
         // Users table
-        $users = $this->table('users');
+        $users = $this->table('users', ['signed' => false]);
         $users->addColumn('username', 'string', ['limit' => 255])
               ->addColumn('password', 'string', ['limit' => 255])
               ->addColumn('created_at', 'datetime', ['null' => true])
@@ -17,28 +17,28 @@ class InitMigration extends AbstractMigration
               ->create();
 
         // Categories table
-        $categories = $this->table('categories');
+        $categories = $this->table('categories', ['signed' => false]);
         $categories->addColumn('name', 'string', ['limit' => 255])
-                   ->addColumn('user_id', 'integer')
+                   ->addColumn('user_id', 'integer', ['signed' => false])
                    ->addColumn('created_at', 'datetime', ['null' => true])
                    ->addColumn('updated_at', 'datetime', ['null' => true])
                    ->addColumn('deleted_at', 'datetime', ['null' => true])
                    ->addIndex(['user_id'])
-                   ->addForeignKey('user_id', 'users', 'id', ['delete' => 'CASCADE'])
+                   ->addForeignKey('user_id', 'users', 'id', ['delete' => 'CASCADE', 'update' => 'NO_ACTION'])
                    ->create();
 
         // Todo items table
-        $todo = $this->table('todo');
+        $todo = $this->table('todo', ['signed' => false]);
         $todo->addColumn('name', 'string', ['limit' => 255])
-             ->addColumn('category_id', 'integer')
-             ->addColumn('user_id', 'integer')
+             ->addColumn('category_id', 'integer', ['signed' => false])
+             ->addColumn('user_id', 'integer', ['signed' => false])
              ->addColumn('created_at', 'datetime', ['null' => true])
              ->addColumn('updated_at', 'datetime', ['null' => true])
              ->addColumn('deleted_at', 'datetime', ['null' => true])
              ->addIndex(['user_id'])
              ->addIndex(['category_id'])
-             ->addForeignKey('user_id', 'users', 'id', ['delete' => 'CASCADE'])
-             ->addForeignKey('category_id', 'categories', 'id', ['delete' => 'CASCADE'])
+             ->addForeignKey('user_id', 'users', 'id', ['delete' => 'CASCADE', 'update' => 'NO_ACTION'])
+             ->addForeignKey('category_id', 'categories', 'id', ['delete' => 'CASCADE', 'update' => 'NO_ACTION'])
              ->create();
     }
 }
