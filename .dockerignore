@@ -1,0 +1,59 @@
+# Monstein API - Docker Ignore
+# Files and directories to exclude from Docker build context
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Development files
+.env
+.env.local
+*.log
+logs/*
+!logs/.gitkeep
+
+# IDE and editor
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Testing
+tests
+phpunit.xml
+phpunit.xml.dist
+.phpunit.result.cache
+coverage
+
+# Documentation
+README.md
+CHANGELOG.md
+LICENSE
+docs
+
+# Development dependencies
+vendor/phpunit
+vendor/bin/phpunit
+
+# Docker (don't copy docker config into container)
+docker-compose*.yml
+Dockerfile*
+.dockerignore
+
+# Database files (if using SQLite locally)
+database/*.sqlite
+
+# Storage (created at runtime)
+storage/ratelimit/*
+!storage/ratelimit/.gitkeep
+
+# Temporary files
+*.tmp
+*.temp
+*.cache

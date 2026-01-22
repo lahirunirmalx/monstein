@@ -3,6 +3,7 @@
 A lightweight RESTful API framework built on Slim 3 with JWT authentication and Eloquent ORM.
 
 [![PHP CI](https://github.com/lahirunirmalx/monstein/actions/workflows/php.yml/badge.svg)](https://github.com/lahirunirmalx/monstein/actions/workflows/php.yml)
+[![Docker](https://img.shields.io/badge/Docker-ghcr.io-blue?logo=docker)](https://ghcr.io/lahirunirmalx/monstein)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Features
@@ -13,14 +14,41 @@ A lightweight RESTful API framework built on Slim 3 with JWT authentication and 
 - **Phinx Migrations** - Database version control
 - **CLI Dev Tools** - Scaffolding for rapid development
 - **Multi-PHP Support** - PHP 7.4, 8.0, 8.1, 8.2, 8.3
+- **Docker Ready** - One-command deployment with load balancing
+- **CI/CD Built-in** - GitHub Actions for testing & Docker builds
 
 ## Requirements
 
 - PHP 7.4 or higher
 - Composer
 - MySQL/MariaDB or SQLite
+- Docker & Docker Compose (optional, for containerized deployment)
 
 ## Installation
+
+### Option 1: Docker (Recommended)
+
+```bash
+# Clone the repository
+git clone https://github.com/lahirunirmalx/monstein.git
+cd monstein
+
+# Setup (creates .env and builds images)
+make setup
+
+# Edit .env with your settings
+nano .env
+
+# Start all services
+make up
+
+# Or with Adminer (database admin)
+make up-dev
+```
+
+Access the API at `http://localhost` (or custom port in .env)
+
+### Option 2: Manual Installation
 
 ```bash
 # Clone the repository
@@ -181,32 +209,49 @@ Edit templates in `stubs/` directory:
 ```
 monstein/
 ├── app/
-│   ├── Base/              # Base classes
+│   ├── Base/                    # Base classes & middleware
 │   │   ├── BaseController.php
 │   │   ├── BaseRouter.php
 │   │   ├── CollectionController.php
 │   │   ├── EntityController.php
-│   │   └── JwtMiddleware.php
+│   │   ├── JwtMiddleware.php
+│   │   ├── RateLimitMiddleware.php
+│   │   ├── ParamValidationMiddleware.php
+│   │   └── SecurityUtils.php
 │   ├── Config/
-│   │   ├── Config.php     # Configuration
-│   │   └── routing.yml    # Route definitions
-│   ├── Controllers/       # API controllers
-│   ├── Models/            # Eloquent models
-│   ├── App.php            # Application bootstrap
-│   ├── Dependencies.php   # DI container
-│   └── Middleware.php     # Middleware setup
+│   │   ├── Config.php           # Configuration
+│   │   └── routing.yml          # Route definitions
+│   ├── Controllers/             # API controllers
+│   ├── Models/                  # Eloquent models
+│   ├── App.php                  # Application bootstrap
+│   ├── Dependencies.php         # DI container
+│   └── Middleware.php           # Middleware setup
 ├── bin/
-│   └── monstein           # CLI tool
+│   └── monstein                 # CLI tool
 ├── db/
-│   └── migrations/        # Phinx migrations
-├── stubs/                 # Code generation templates
+│   └── migrations/              # Phinx migrations
+├── docker/                      # Docker configuration
+│   ├── entrypoint.sh            # Container startup script
+│   ├── nginx.conf               # App Nginx config
+│   ├── nginx-lb.conf            # Load balancer config
+│   ├── php-fpm.conf             # PHP-FPM config
+│   ├── php.ini                  # PHP settings
+│   ├── supervisord.conf         # Process manager
+│   └── mysql-init/              # Database init scripts
+├── stubs/                       # Code generation templates
 ├── symfony/
 │   └── web/
-│       └── index.php      # Entry point
-├── tests/                 # PHPUnit tests
-├── .env.example           # Environment template
+│       └── index.php            # Entry point
+├── tests/                       # PHPUnit tests
+├── .env.example                 # Environment template
+├── .env.docker                  # Docker environment template
+├── .github/workflows/php.yml    # CI/CD pipeline
+├── docker-compose.yml           # Docker Compose config
+├── Dockerfile                   # Container build
+├── Makefile                     # Make commands
+├── setup.sh                     # One-command setup
 ├── composer.json
-└── phinx.php              # Migration config
+└── phinx.php                    # Migration config
 ```
 
 ## Database Migrations
@@ -229,6 +274,164 @@ composer seed
 composer test
 ```
 
+## Docker Deployment
+
+### One-Command Setup
+
+The easiest way to get started:
+
+```bash
+./setup.sh
+```
+
+This single command will:
+- ✅ Check prerequisites (Docker, Docker Compose)
+- ✅ Create `.env` with secure random passwords
+- ✅ Build Docker images
+- ✅ Start all services (app, database, load balancer)
+- ✅ Run database migrations
+- ✅ Create demo user (`demo` / `demo123`)
+- ✅ Display access URLs
+
+#### Setup Options
+
+```bash
+./setup.sh                    # Default setup (port 8080)
+./setup.sh --port 80          # Custom port
+./setup.sh --scale 3          # 3 app instances
+./setup.sh --dev              # Include Adminer (DB admin)
+./setup.sh --clean            # Clean start (removes existing data)
+```
+
+### Pull from GitHub Container Registry
+
+Pre-built images are available from GitHub Container Registry:
+
+```bash
+# Pull latest image
+docker pull ghcr.io/lahirunirmalx/monstein:latest
+
+# Pull specific version
+docker pull ghcr.io/lahirunirmalx/monstein:main
+docker pull ghcr.io/lahirunirmalx/monstein:<commit-sha>
+```
+
+### Quick Start with Make
+
+```bash
+make setup    # Initial setup
+make up       # Start services
+make down     # Stop services
+```
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Load Balancer                        │
+│                   (Nginx - Port 80/443)                 │
+└─────────────────────┬───────────────────────────────────┘
+                      │
+          ┌───────────┴───────────┐
+          │                       │
+┌─────────▼─────────┐   ┌─────────▼─────────┐
+│    App Instance   │   │    App Instance   │
+│   (PHP 8.2-FPM)   │   │   (PHP 8.2-FPM)   │
+│   + Nginx + PHP   │   │   + Nginx + PHP   │
+└─────────┬─────────┘   └─────────┬─────────┘
+          │                       │
+          └───────────┬───────────┘
+                      │
+          ┌───────────▼───────────┐
+          │      MariaDB 10.11    │
+          │      (Port 3306)      │
+          └───────────────────────┘
+```
+
+### Docker Image Details
+
+| Property | Value |
+|----------|-------|
+| Base Image | `php:8.2-fpm-alpine` |
+| Size | ~50MB (minimal Alpine) |
+| Registry | `ghcr.io/lahirunirmalx/monstein` |
+| Tags | `latest`, `main`, `<commit-sha>` |
+
+### Available Commands
+
+| Command | Description |
+|---------|-------------|
+| `make up` | Start all services |
+| `make up-dev` | Start with Adminer (DB admin) |
+| `make down` | Stop all services |
+| `make build` | Build Docker images |
+| `make scale N=3` | Scale to N app instances |
+| `make logs` | View all logs |
+| `make db-shell` | Open database shell |
+| `make migrate` | Run migrations |
+| `make shell` | Open app container shell |
+| `make test` | Run tests |
+| `make clean` | Remove all containers/volumes |
+
+### Port Configuration
+
+Edit `.env` to customize ports:
+
+```env
+LB_PORT=8080            # Load balancer HTTP (main entry)
+LB_SSL_PORT=8443        # Load balancer HTTPS
+DB_EXTERNAL_PORT=3306   # Database (direct access)
+ADMINER_PORT=8081       # Adminer (dev only)
+```
+
+### Scaling
+
+```bash
+# Scale to 3 app instances
+make scale N=3
+
+# Or with docker-compose
+docker compose up -d --scale app=3
+```
+
+The load balancer automatically distributes traffic across all instances.
+
+### Health Checks
+
+```bash
+# Load balancer health
+curl http://localhost:8080/lb-health
+
+# Application health
+curl http://localhost:8080/health
+```
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `APP_ENV` | `production` | Environment (development/production) |
+| `APP_DEBUG` | `false` | Debug mode |
+| `DB_HOST` | `db` | Database host |
+| `DB_NAME` | `monstein` | Database name |
+| `DB_USER` | `monstein` | Database user |
+| `DB_PASS` | (random) | Database password |
+| `JWT_SECRET` | (random) | JWT signing secret |
+| `JWT_EXPIRES` | `30` | Token expiry (minutes) |
+| `RATE_LIMIT_MAX` | `100` | Max requests per window |
+| `RATE_LIMIT_WINDOW` | `60` | Rate limit window (seconds) |
+
+### CI/CD Pipeline
+
+The GitHub Actions workflow automatically:
+
+1. **Code Quality** - Syntax checks, structure validation (PHP 7.4-8.3)
+2. **Security** - Dependency audit, secret detection
+3. **Docker Build** - Build and push to GitHub Container Registry
+4. **Docker Test** - Verify the built image works
+
+Images are automatically built and pushed on every push to `main` branch.
+
 ## Security
 
 - JWT tokens with configurable expiration
@@ -236,6 +439,9 @@ composer test
 - Security headers on all responses
 - Environment-based configuration (no hardcoded secrets)
 - CORS protection
+- Rate limiting (configurable per route)
+- XSS/MITM protection headers
+- Parameter validation on routes
 
 ## Contributing
 
