@@ -211,18 +211,18 @@ jobs:
         sed -i "s|build:|image: ghcr.io/${REPO_LC}:${{ github.sha }}\n    # build:|" docker-compose.yml
         
         # Start services
-        docker-compose up -d db
+        docker compose up -d db
         
         # Wait for database
         echo "Waiting for database..."
         sleep 30
         
         # Start app
-        docker-compose up -d app
+        docker compose up -d app
         sleep 10
         
         # Start load balancer
-        docker-compose up -d loadbalancer
+        docker compose up -d loadbalancer
         sleep 5
 
     - name: Test health endpoint
@@ -237,9 +237,9 @@ jobs:
           sleep 5
         done
         echo "✗ Health check failed"
-        docker-compose logs
+        docker compose logs
         exit 1
 
     - name: Cleanup
       if: always()
-      run: docker-compose down -v
+      run: docker compose down -v
