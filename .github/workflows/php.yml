@@ -206,12 +206,15 @@ jobs:
 
     - name: Pull and tag built image
       run: |
-        # Pull the built image from GHCR
+        # Pull the built image from GHCR using branch name tag
         REPO_LC="${{ steps.repo.outputs.name }}"
-        docker pull ghcr.io/${REPO_LC}:${{ github.sha }}
+        BRANCH_NAME="${GITHUB_REF_NAME}"
+        
+        echo "Pulling ghcr.io/${REPO_LC}:${BRANCH_NAME}..."
+        docker pull ghcr.io/${REPO_LC}:${BRANCH_NAME}
         
         # Tag it as the local image name that docker-compose expects
-        docker tag ghcr.io/${REPO_LC}:${{ github.sha }} monstein/api:latest
+        docker tag ghcr.io/${REPO_LC}:${BRANCH_NAME} monstein/api:latest
         
         echo "✓ Image pulled and tagged as monstein/api:latest"
 
