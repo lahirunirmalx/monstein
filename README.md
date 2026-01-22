@@ -19,8 +19,33 @@ A lightweight RESTful API framework built on Slim 3 with JWT authentication and 
 - PHP 7.4 or higher
 - Composer
 - MySQL/MariaDB or SQLite
+- Docker & Docker Compose (optional, for containerized deployment)
 
 ## Installation
+
+### Option 1: Docker (Recommended)
+
+```bash
+# Clone the repository
+git clone https://github.com/lahirunirmalx/monstein.git
+cd monstein
+
+# Setup (creates .env and builds images)
+make setup
+
+# Edit .env with your settings
+nano .env
+
+# Start all services
+make up
+
+# Or with Adminer (database admin)
+make up-dev
+```
+
+Access the API at `http://localhost` (or custom port in .env)
+
+### Option 2: Manual Installation
 
 ```bash
 # Clone the repository
@@ -229,6 +254,85 @@ composer seed
 composer test
 ```
 
+## Docker Deployment
+
+### Quick Start
+
+```bash
+make setup    # Initial setup
+make up       # Start services
+make down     # Stop services
+```
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Load Balancer                        │
+│                   (Nginx - Port 80)                     │
+└─────────────────────┬───────────────────────────────────┘
+                      │
+          ┌───────────┴───────────┐
+          │                       │
+┌─────────▼─────────┐   ┌─────────▼─────────┐
+│    App Instance   │   │    App Instance   │
+│   (PHP 8.2-FPM)   │   │   (PHP 8.2-FPM)   │
+└─────────┬─────────┘   └─────────┬─────────┘
+          │                       │
+          └───────────┬───────────┘
+                      │
+          ┌───────────▼───────────┐
+          │      MariaDB 10.11    │
+          │      (Port 3306)      │
+          └───────────────────────┘
+```
+
+### Available Commands
+
+| Command | Description |
+|---------|-------------|
+| `make up` | Start all services |
+| `make up-dev` | Start with Adminer (DB admin) |
+| `make down` | Stop all services |
+| `make scale N=3` | Scale to N app instances |
+| `make logs` | View all logs |
+| `make db-shell` | Open database shell |
+| `make migrate` | Run migrations |
+| `make shell` | Open app container shell |
+| `make test` | Run tests |
+| `make clean` | Remove all containers/volumes |
+
+### Port Configuration
+
+Edit `.env` to customize ports:
+
+```env
+LB_PORT=80              # Load balancer (main entry)
+LB_SSL_PORT=443         # HTTPS
+DB_EXTERNAL_PORT=3306   # Database
+ADMINER_PORT=8081       # Adminer (dev only)
+```
+
+### Scaling
+
+```bash
+# Scale to 3 app instances
+make scale N=3
+
+# Or with docker-compose
+docker-compose up -d --scale app=3
+```
+
+### Health Checks
+
+```bash
+# Load balancer health
+curl http://localhost/lb-health
+
+# Application health
+curl http://localhost/health
+```
+
 ## Security
 
 - JWT tokens with configurable expiration
@@ -236,6 +340,9 @@ composer test
 - Security headers on all responses
 - Environment-based configuration (no hardcoded secrets)
 - CORS protection
+- Rate limiting (configurable per route)
+- XSS/MITM protection headers
+- Parameter validation on routes
 
 ## Contributing
 
