@@ -220,6 +220,14 @@ jobs:
 
     - name: Start services
       run: |
+        # Create volumes first to avoid race conditions
+        docker volume create monstein_app_logs || true
+        docker volume create monstein_app_storage || true
+        docker volume create monstein_db_data || true
+        
+        # Pre-create storage directory structure
+        docker run --rm -v monstein_app_storage:/storage alpine sh -c "mkdir -p /storage/ratelimit && chmod 755 /storage/ratelimit"
+        
         # Start database first
         docker compose up -d db
         
@@ -227,8 +235,8 @@ jobs:
         echo "Waiting for database..."
         sleep 30
         
-        # Start app (will use pre-pulled image, skip build)
-        docker compose up -d --no-build app
+        # Start single app instance to avoid volume conflicts
+        docker compose up -d --no-build --scale app=1 app
         sleep 10
         
         # Start load balancer
