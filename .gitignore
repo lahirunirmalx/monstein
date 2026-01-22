@@ -64,3 +64,5 @@ phpunit.xml
 *.pem
 *.key
 *.crt
+storage/ratelimit/*
+!storage/ratelimit/.gitkeep

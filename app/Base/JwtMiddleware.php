@@ -116,15 +116,31 @@ class JwtMiddleware
     /**
      * Check if path should be ignored
      * 
+     * Uses strict path matching to prevent bypass attacks.
+     * Only exact matches or prefix matches with trailing slash are allowed.
+     * 
      * @param string $path
      * @return bool
      */
     private function isIgnoredPath(string $path): bool
     {
+        // Normalize path - remove trailing slashes and decode
+        $normalizedPath = rtrim(urldecode($path), '/');
+        
         foreach ($this->ignorePaths as $ignorePath) {
-            // Exact match or pattern match
-            if ($path === $ignorePath || fnmatch($ignorePath, $path)) {
+            $normalizedIgnore = rtrim($ignorePath, '/');
+            
+            // Exact match only (no wildcards to prevent bypasses)
+            if ($normalizedPath === $normalizedIgnore) {
                 return true;
+            }
+            
+            // Prefix match for path hierarchies (e.g., /public/* matches /public/file)
+            if (substr($normalizedIgnore, -1) === '*') {
+                $prefix = rtrim($normalizedIgnore, '*');
+                if (strpos($normalizedPath, $prefix) === 0) {
+                    return true;
+                }
             }
         }
         return false;

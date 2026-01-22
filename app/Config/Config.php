@@ -93,14 +93,26 @@ class Config
     /**
      * Get CORS configuration
      * 
+     * WARNING: In production, set CORS_ORIGIN to your specific domain(s)
+     * Wildcard (*) allows any origin to access your API.
+     * 
      * @return array CORS settings
      */
     public static function cors(): array
     {
+        $origin = self::env('CORS_ORIGIN', '');
+        
+        // In production, require explicit CORS_ORIGIN configuration
+        if (empty($origin)) {
+            // Fallback to restrictive origin in production, permissive in development
+            $origin = self::isDebug() ? '*' : 'null';
+        }
+        
         return [
-            'origin'  => self::env('CORS_ORIGIN', '*'),
+            'origin'  => $origin,
             'headers' => self::env('CORS_HEADERS', 'X-Requested-With, Content-Type, Accept, Origin, Authorization'),
             'methods' => self::env('CORS_METHODS', 'GET, POST, PUT, DELETE, PATCH, OPTIONS'),
+            'credentials' => filter_var(self::env('CORS_CREDENTIALS', 'false'), FILTER_VALIDATE_BOOLEAN),
         ];
     }
 

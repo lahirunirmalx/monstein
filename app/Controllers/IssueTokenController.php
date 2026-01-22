@@ -13,31 +13,40 @@ class IssueTokenController extends BaseController {
     public function doPost(Request $request, Response $response,$args,$cleanValues) {
         $this->getLogger()->info('POST /users/login');
         $data = $cleanValues;
-        $errors = [];
+        $isValid = true;
+        $user = null;
 
-        // validate username
-        if (!$errors && !($user = User::where(['username' => $data['username']])->first())) {
-            $errors[] = 'Username invalid';
-        }
-        // validate password
-        if (!$errors && !password_verify($data['password'], $user->password)) {
-            $errors[] = 'Password invalid';
-        }
-        if (!$errors) {
-            // No errors, generate JWT
-            $token = $user->tokenCreate();
-            // return token
-            return $response->withJson([
-                "success" => true,
-                "data" => [
-                    "token" => $token['token'],
-                    "expires" => $token['expires']
-                ]
-            ], 200);
+        // Validate username - use constant-time comparison approach
+        $user = User::where(['username' => $data['username']])->first();
+        
+        if ($user === null) {
+            // User not found - still run password_verify to prevent timing attacks
+            // Use a dummy hash to prevent timing differences
+            password_verify($data['password'], '$2y$10$dummyhashtopreventtimingattacksaaaaaaaaaaaaaaaaaaaaa');
+            $isValid = false;
         } else {
-            // Error occured
-            return $this->handleValidationFail($errors,$response);
+            // Validate password with timing-safe comparison
+            if (!password_verify($data['password'], $user->password)) {
+                $isValid = false;
+            }
         }
+
+        // Generic error message prevents username enumeration
+        if (!$isValid) {
+            $this->getLogger()->info('Failed login attempt', ['username' => $data['username']]);
+            return $this->handleValidationFail(['Invalid username or password'], $response);
+        }
+        
+        // Generate JWT token for authenticated user
+        $token = $user->tokenCreate();
+        
+        return $response->withJson([
+            "success" => true,
+            "data" => [
+                "token" => $token['token'],
+                "expires" => $token['expires']
+            ]
+        ], 200);
     }
 
     public function validateGetRequest()
