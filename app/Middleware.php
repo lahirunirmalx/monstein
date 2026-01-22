@@ -4,13 +4,15 @@ namespace Monstein;
 use Monstein\Base\BaseRouter;
 use Monstein\Base\JwtMiddleware;
 use Monstein\Base\RateLimitMiddleware;
+use Monstein\Base\ParamValidationMiddleware;
 use Monstein\Config\Config;
 
 /**
  * Middleware configuration for the Monstein application
  * 
  * Implements comprehensive security measures:
- * - Rate limiting (DDoS/brute-force protection)
+ * - Rate limiting (DDoS/brute-force protection) - configurable per route
+ * - Parameter validation using Respect Validation
  * - Security headers (XSS, clickjacking, MITM protection)
  * - CORS configuration
  * - JWT authentication
@@ -31,8 +33,9 @@ class Middleware
         $this->app = $app;
         $this->container = $app->getContainer();
         
-        // Order matters: rate limiting first, then security headers, CORS, and JWT
+        // Order matters: rate limiting first, then param validation, security headers, CORS, and JWT
         $this->rateLimit();
+        $this->paramValidation();
         $this->securityHeaders();
         $this->cors();
         $this->jwt();
@@ -40,28 +43,41 @@ class Middleware
 
     /**
      * Configure rate limiting to prevent DDoS and brute-force attacks
+     * 
+     * Rate limits are configured per-route in routing.yml:
+     *   rate_limit:
+     *     enabled: true/false
+     *     max_requests: 10
+     *     window_seconds: 60
+     * 
+     * If not specified, defaults from BaseRouter are used:
+     *   - Secure routes: 100 requests/minute
+     *   - Public routes: 30 requests/minute
      */
     private function rateLimit(): void
     {
-        $ignorePaths = array_keys(BaseRouter::getInstance()->getIgnorePaths());
-        
-        // Stricter limits for authentication endpoints
-        $customLimits = [];
-        foreach ($ignorePaths as $path) {
-            // Login/token endpoints: 10 requests per minute (brute-force protection)
-            if (strpos($path, 'token') !== false || strpos($path, 'login') !== false) {
-                $customLimits[$path] = [10, 60];
-            } else {
-                // Other public endpoints: 30 requests per minute
-                $customLimits[$path] = [30, 60];
-            }
-        }
-        
+        // Rate limits are now configured per-route in routing.yml
+        // RateLimitMiddleware reads config from BaseRouter
         $this->app->add(new RateLimitMiddleware([
             'max_requests' => (int) ($_ENV['RATE_LIMIT_MAX'] ?? 100),
             'window_seconds' => (int) ($_ENV['RATE_LIMIT_WINDOW'] ?? 60),
             'storage_dir' => dirname(__DIR__) . '/storage/ratelimit',
-            'custom_limits' => $customLimits,
+            'logger' => $this->container['logger'],
+        ]));
+    }
+
+    /**
+     * Configure parameter validation middleware
+     * 
+     * Validates route parameters (like {id}) using Respect Validation.
+     * Rules are configured per-route in routing.yml:
+     *   params:
+     *     id: id
+     *     slug: slug
+     */
+    private function paramValidation(): void
+    {
+        $this->app->add(new ParamValidationMiddleware([
             'logger' => $this->container['logger'],
         ]));
     }

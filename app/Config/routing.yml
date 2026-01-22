@@ -1,26 +1,56 @@
+# Monstein API Routes Configuration
+# 
+# Rate Limiting Options (optional):
+#   rate_limit:
+#     enabled: true/false (default: true)
+#     max_requests: number (default: 100 for secure, 30 for public)
+#     window_seconds: number (default: 60)
+#
+# Parameter Validation (optional):
+#   params:
+#     {param_name}: validation_type
+#   Supported types: id, integer, uuid, slug, alpha, alphanumeric
+#
+# ============================================================================
+
 issueToken:
   url: /issueToken
   controller: \Monstein\Controllers\IssueTokenController
   method: [ post ]
   is_secure: false
+  rate_limit:
+    enabled: true
+    max_requests: 10      # Strict limit for login (brute-force protection)
+    window_seconds: 60
+
 todos:
   url: /todo
   controller: \Monstein\Controllers\TodoCollectionController
   method: [ post , get ]
+
 todo:
   url: /todo/{id}
   controller: \Monstein\Controllers\TodoEntityController
   method: [ put , get , delete ]
+  params:
+    id: id                # Validates as positive integer
+
 categories:
   url: /categories
   controller: \Monstein\Controllers\CategoryCollectionController
   method: [ post , get ]
+
 category:
   url: /category/{id}
   controller: \Monstein\Controllers\CategoryEntityController
   method: [ put , get , delete ]
+  params:
+    id: id
+
 category_todos:
   url: /category/{id}/todos
   controller: \Monstein\Controllers\CategoryEntityController
-  service : todos
-  method: [  get  ]
+  service: todos
+  method: [ get ]
+  params:
+    id: id

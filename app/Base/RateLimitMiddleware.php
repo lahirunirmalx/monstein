@@ -72,7 +72,12 @@ class RateLimitMiddleware
         $path = $request->getUri()->getPath();
         
         // Get rate limit settings for this path
-        list($maxRequests, $windowSeconds) = $this->getLimitsForPath($path);
+        list($maxRequests, $windowSeconds, $enabled) = $this->getLimitsForPath($path);
+        
+        // Skip rate limiting if disabled for this route
+        if (!$enabled) {
+            return $next($request, $response);
+        }
         
         // Create unique key for this IP + path combination
         $key = $this->createKey($clientIp, $path);
@@ -104,18 +109,38 @@ class RateLimitMiddleware
     /**
      * Get rate limits for a specific path
      * 
+     * Uses route-specific configuration from BaseRouter if available,
+     * otherwise falls back to custom limits or defaults.
+     * 
      * @param string $path
-     * @return array [maxRequests, windowSeconds]
+     * @return array [maxRequests, windowSeconds, enabled]
      */
     private function getLimitsForPath(string $path): array
     {
+        // First, check BaseRouter for route-specific configuration
+        $routeConfig = BaseRouter::getInstance()->getRateLimitForPath($path);
+        
+        if (!empty($routeConfig)) {
+            // Check if rate limiting is disabled for this route
+            if (isset($routeConfig['enabled']) && $routeConfig['enabled'] === false) {
+                return [PHP_INT_MAX, 1, false]; // Effectively disabled
+            }
+            
+            return [
+                $routeConfig['max_requests'] ?? $this->maxRequests,
+                $routeConfig['window_seconds'] ?? $this->windowSeconds,
+                true
+            ];
+        }
+        
+        // Fall back to custom limits passed to constructor
         foreach ($this->customLimits as $pattern => $limits) {
             if ($path === $pattern || strpos($path, rtrim($pattern, '*')) === 0) {
-                return [$limits[0], $limits[1]];
+                return [$limits[0], $limits[1], true];
             }
         }
         
-        return [$this->maxRequests, $this->windowSeconds];
+        return [$this->maxRequests, $this->windowSeconds, true];
     }
 
     /**
