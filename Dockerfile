@@ -8,17 +8,14 @@ FROM composer:2 AS composer
 
 WORKDIR /app
 
-# Copy composer files first for better caching
+# Copy composer files (ignore lock file to ensure fresh install)
 COPY composer.json ./
 
-# Install dependencies (no dev for production)
-RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist
+# Install dependencies without dev packages
+RUN composer update --no-dev --no-scripts --prefer-dist --optimize-autoloader
 
-# Copy application source
-COPY . .
-
-# Generate optimized autoloader
-RUN composer dump-autoload --optimize --no-dev
+# Save vendor to a temp location
+RUN mv vendor /vendor-clean
 
 # ============================================================================
 # Stage 2: Production image (Alpine-based minimal PHP)
@@ -34,8 +31,6 @@ RUN apk add --no-cache \
     nginx \
     supervisor \
     curl \
-    # MySQL/MariaDB client libraries
-    mariadb-client \
     # Required for pdo_mysql
     && docker-php-ext-install pdo pdo_mysql \
     # Clean up
@@ -52,9 +47,12 @@ RUN mkdir -p /var/run/nginx /var/log/nginx /var/log/supervisor \
 
 WORKDIR /app
 
-# Copy application from composer stage
-COPY --from=composer --chown=monstein:monstein /app/vendor ./vendor
+# Copy application source (excluding vendor which might have dev deps)
 COPY --chown=monstein:monstein . .
+
+# Remove any local vendor and copy clean vendor from composer stage
+RUN rm -rf vendor
+COPY --from=composer --chown=monstein:monstein /vendor-clean ./vendor
 
 # Create logs and storage directories with proper permissions
 RUN mkdir -p logs storage/ratelimit \
@@ -64,6 +62,7 @@ RUN mkdir -p logs storage/ratelimit \
 # Copy configuration files
 COPY docker/nginx.conf /etc/nginx/nginx.conf
 COPY docker/php-fpm.conf /usr/local/etc/php-fpm.d/www.conf
+COPY docker/php.ini /usr/local/etc/php/conf.d/monstein.ini
 COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY docker/entrypoint.sh /entrypoint.sh
 

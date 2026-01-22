@@ -5,7 +5,7 @@ echo "=========================================="
 echo "  Monstein API - Container Starting"
 echo "=========================================="
 
-# Wait for database to be ready
+# Wait for database to be ready using PHP (no mysql-client needed)
 wait_for_db() {
     echo "Waiting for database connection..."
     
@@ -13,12 +13,22 @@ wait_for_db() {
     DB_PORT="${DB_PORT:-3306}"
     DB_USER="${DB_USER:-monstein}"
     DB_PASS="${DB_PASS:-}"
+    DB_NAME="${DB_NAME:-monstein}"
     
     max_attempts=30
     attempt=0
     
     while [ $attempt -lt $max_attempts ]; do
-        if mysql -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASS" -e "SELECT 1" >/dev/null 2>&1; then
+        # Use PHP to test database connection (PDO is available)
+        if php -r "
+            try {
+                \$dsn = 'mysql:host=$DB_HOST;port=$DB_PORT;dbname=$DB_NAME';
+                new PDO(\$dsn, '$DB_USER', '$DB_PASS', [PDO::ATTR_TIMEOUT => 5]);
+                exit(0);
+            } catch (Exception \$e) {
+                exit(1);
+            }
+        " 2>/dev/null; then
             echo "✓ Database connection established"
             return 0
         fi
