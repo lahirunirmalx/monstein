@@ -20,6 +20,17 @@
 #     db_format: 'base64' | 'blob' (for database storage)
 #     strict: true/false (return error if any file fails, default: false)
 #
+# Usage Tracking Options (optional):
+#   tracking: true/false         # Simple enable/disable
+#   OR
+#   tracking:
+#     enabled: true/false        # Enable tracking for this endpoint
+#     name: "custom_name"        # Custom name for reports/analytics
+#     track_user: true/false     # Track user ID (default: true)
+#     track_ip: true/false       # Track IP address (default: true)
+#     track_user_agent: false    # Track user agent (default: false)
+#     track_body: false          # Track request body (default: false, security risk!)
+#
 # ============================================================================
 
 issueToken:
@@ -31,11 +42,17 @@ issueToken:
     enabled: true
     max_requests: 10      # Strict limit for login (brute-force protection)
     window_seconds: 60
+  tracking:
+    enabled: true
+    name: "auth_login"    # Custom name for analytics
+    track_user: false     # No user yet (login endpoint)
+    track_ip: true        # Track IP for security
 
 todos:
   url: /todo
   controller: \Monstein\Controllers\TodoCollectionController
   method: [ post , get ]
+  tracking: true          # Simple enable (uses defaults)
 
 todo:
   url: /todo/{id}
@@ -97,3 +114,34 @@ files_images:
     allowed_types: images
     storage: database             # Store in database
     db_format: base64
+
+# ============================================================================
+# Usage Statistics Endpoints
+# ============================================================================
+
+usage_stats:
+  url: /usage/stats
+  controller: \Monstein\Controllers\UsageStatsController
+  method: [ get ]
+  tracking: false                 # Don't track the tracking endpoint itself
+
+usage_top:
+  url: /usage/top
+  controller: \Monstein\Controllers\UsageStatsController
+  service: topEndpoints
+  method: [ get ]
+  tracking: false
+
+usage_slow:
+  url: /usage/slow
+  controller: \Monstein\Controllers\UsageStatsController
+  service: slowEndpoints
+  method: [ get ]
+  tracking: false
+
+usage_errors:
+  url: /usage/errors
+  controller: \Monstein\Controllers\UsageStatsController
+  service: errorRates
+  method: [ get ]
+  tracking: false

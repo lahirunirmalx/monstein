@@ -29,6 +29,9 @@ class BaseRouter
     /** @var array File upload configurations per path */
     private static $fileUploadConfigs = [];
 
+    /** @var array Usage tracking configurations per path */
+    private static $trackingConfigs = [];
+
     /** @var array Default rate limits */
     private static $defaultLimits = [
         'secure' => ['max_requests' => 100, 'window_seconds' => 60],
@@ -98,6 +101,9 @@ class BaseRouter
             
             // Parse file upload configuration
             $this->parseFileUploadConfig($url, $route);
+            
+            // Parse usage tracking configuration
+            $this->parseTrackingConfig($url, $route);
             
             $method = $this->getMethods($route['method']);
             $service = $route['service'] ?? 'handle';
@@ -177,6 +183,27 @@ class BaseRouter
         if (isset($route['file_upload']) && is_array($route['file_upload'])) {
             self::$fileUploadConfigs[$url] = $route['file_upload'];
         }
+    }
+
+    /**
+     * Parse usage tracking configuration for a route
+     * 
+     * @param string $url Route URL
+     * @param array $route Route configuration
+     */
+    private function parseTrackingConfig(string $url, array $route): void
+    {
+        if (isset($route['tracking'])) {
+            if (is_bool($route['tracking'])) {
+                // Simple boolean: tracking: true/false
+                self::$trackingConfigs[$url] = ['enabled' => $route['tracking']];
+            } elseif (is_array($route['tracking'])) {
+                // Full configuration
+                self::$trackingConfigs[$url] = $route['tracking'];
+            }
+        }
+        // Default: tracking enabled for all routes if not specified
+        // This can be overridden by setting USAGE_TRACKER_ENABLED=false globally
     }
 
     /**
@@ -291,6 +318,40 @@ class BaseRouter
     public function getAllFileUploadConfigs(): array
     {
         return self::$fileUploadConfigs;
+    }
+
+    /**
+     * Get usage tracking configuration for a path
+     * 
+     * @param string $path Request path
+     * @return array Tracking config or default (enabled)
+     */
+    public function getTrackingConfig(string $path): array
+    {
+        // Try exact match first
+        if (isset(self::$trackingConfigs[$path])) {
+            return self::$trackingConfigs[$path];
+        }
+        
+        // Try pattern matching for paths with parameters
+        foreach (self::$trackingConfigs as $pattern => $config) {
+            if ($this->pathMatchesPattern($path, $pattern)) {
+                return $config;
+            }
+        }
+        
+        // Default: enabled with standard options
+        return ['enabled' => true];
+    }
+
+    /**
+     * Get all tracking configurations
+     * 
+     * @return array
+     */
+    public function getAllTrackingConfigs(): array
+    {
+        return self::$trackingConfigs;
     }
 
     /**

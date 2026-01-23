@@ -6,6 +6,7 @@ use Monstein\Base\JwtMiddleware;
 use Monstein\Base\RateLimitMiddleware;
 use Monstein\Base\ParamValidationMiddleware;
 use Monstein\Base\FileUploadMiddleware;
+use Monstein\Base\UsageTrackingMiddleware;
 use Monstein\Config\Config;
 
 /**
@@ -34,7 +35,8 @@ class Middleware
         $this->app = $app;
         $this->container = $app->getContainer();
         
-        // Order matters: rate limiting first, then param validation, security headers, CORS, JWT, and file upload
+        // Order matters: usage tracking first (to capture all requests), then rate limiting, validation, etc.
+        $this->usageTracking();
         $this->rateLimit();
         $this->paramValidation();
         $this->securityHeaders();
@@ -197,6 +199,22 @@ class Middleware
     private function fileUpload(): void
     {
         $this->app->add(new FileUploadMiddleware([
+            'logger' => $this->container['logger'],
+        ]));
+    }
+
+    /**
+     * Configure Usage Tracking middleware
+     * 
+     * Tracks API endpoint usage for analytics and monitoring.
+     * Configuration per-route in routing.yml, or globally via environment:
+     *   USAGE_TRACKER_ENABLED=true/false
+     *   USAGE_TRACKER_DRIVER=database/file/memory
+     *   USAGE_TRACKER_SAMPLE_RATE=100 (percentage)
+     */
+    private function usageTracking(): void
+    {
+        $this->app->add(new UsageTrackingMiddleware([
             'logger' => $this->container['logger'],
         ]));
     }

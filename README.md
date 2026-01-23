@@ -16,6 +16,9 @@ A lightweight RESTful API framework built on Slim 3 with JWT authentication and 
 - **Multi-PHP Support** - PHP 7.4, 8.0, 8.1, 8.2, 8.3
 - **Docker Ready** - One-command deployment with load balancing
 - **CI/CD Built-in** - GitHub Actions for testing & Docker builds
+- **File Uploads** - Multipart and base64 support with configurable storage
+- **Usage Tracking** - Automatic API analytics and monitoring
+- **Rate Limiting** - Configurable per-route protection
 
 ## Requirements
 
@@ -169,6 +172,70 @@ curl -X DELETE http://localhost:8080/todos/1 \
   -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
+#### File Uploads
+
+```bash
+# Upload file (multipart form)
+curl -X POST http://localhost:8080/files \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "file=@/path/to/document.pdf"
+
+# Upload multiple files
+curl -X POST http://localhost:8080/files \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "file1=@image1.jpg" \
+  -F "file2=@image2.png"
+
+# Upload file (base64 encoded)
+curl -X POST http://localhost:8080/files \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "file_data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+    "file_name": "pixel.png"
+  }'
+
+# List uploaded files
+curl http://localhost:8080/files \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Get file info
+curl http://localhost:8080/files/1 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Download file
+curl http://localhost:8080/files/1?download=true \
+  -H "Authorization: Bearer YOUR_TOKEN" -O
+
+# Delete file
+curl -X DELETE http://localhost:8080/files/1 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+#### Usage Statistics
+
+```bash
+# Get overall usage stats
+curl http://localhost:8080/usage/stats \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Get stats for specific period (hour, day, week, month)
+curl "http://localhost:8080/usage/stats?period=week" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Get top endpoints by request count
+curl "http://localhost:8080/usage/top?limit=10" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Get slowest endpoints
+curl "http://localhost:8080/usage/slow?limit=5" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Get error rates
+curl http://localhost:8080/usage/errors \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
 ## Developer Tools
 
 Generate boilerplate code with CLI commands:
@@ -185,6 +252,15 @@ composer make:controller Product
 
 # Create migration only
 composer make:migration Product
+
+# Create file upload endpoint
+composer make:file-endpoint Document
+
+# List all registered routes
+./bin/monstein routes:list
+
+# Show usage tracking configuration
+./bin/monstein usage:stats
 ```
 
 ### Generated Files
@@ -195,6 +271,7 @@ composer make:migration Product
 | `make:entity Product` | `app/Models/Product.php` |
 | `make:controller Product` | `app/Controllers/ProductCollectionController.php`<br>`app/Controllers/ProductEntityController.php` |
 | `make:migration Product` | `db/migrations/YYYYMMDD_create_products.php` |
+| `make:file-endpoint Document` | `app/Controllers/DocumentCollectionController.php`<br>`app/Controllers/DocumentEntityController.php` |
 
 ### Customizing Stubs
 
@@ -203,6 +280,131 @@ Edit templates in `stubs/` directory:
 - `collection-controller.stub` - Collection controller template
 - `entity-controller.stub` - Entity controller template
 - `migration.stub` - Phinx migration template
+
+## File Uploads
+
+Monstein provides a robust file upload system with flexible storage options.
+
+### Configuration in `routing.yml`
+
+```yaml
+files:
+  url: /files
+  controller: \Monstein\Controllers\FileCollectionController
+  method: [ post, get ]
+  file_upload:
+    enabled: true
+    max_size: 10485760          # 10MB (in bytes)
+    allowed_types: all          # 'images', 'documents', 'all', or array
+    storage: filesystem         # 'filesystem', 'database', or 'both'
+    db_format: base64           # 'base64' or 'blob'
+    strict: false               # Return error if any file fails
+```
+
+### Storage Options
+
+| Option | Description |
+|--------|-------------|
+| `filesystem` | Store files on disk in `storage/uploads/` |
+| `database` | Store files in database as base64 or blob |
+| `both` | Store both on filesystem and in database |
+
+### Allowed Types
+
+| Value | Description |
+|-------|-------------|
+| `images` | jpeg, png, gif, webp, svg |
+| `documents` | pdf, doc, docx, xls, xlsx, txt, csv |
+| `all` | All supported file types |
+| `['image/png', 'application/pdf']` | Custom array of MIME types |
+
+### Environment Variables
+
+```env
+FILE_STORAGE_PATH=/app/storage/uploads    # File storage directory
+FILE_BASE_URL=https://api.example.com     # Base URL for file access
+```
+
+## Usage Tracking
+
+Automatic API usage tracking via middleware.
+
+### Configuration in `routing.yml`
+
+```yaml
+todos:
+  url: /todo
+  controller: \Monstein\Controllers\TodoCollectionController
+  method: [ post, get ]
+  tracking: true              # Simple enable
+
+# Or with full options:
+issueToken:
+  url: /issueToken
+  controller: \Monstein\Controllers\IssueTokenController
+  method: [ post ]
+  tracking:
+    enabled: true
+    name: "auth_login"        # Custom name for analytics
+    track_user: false         # Track user ID (default: true)
+    track_ip: true            # Track IP address (default: true)
+    track_user_agent: false   # Track user agent (default: false)
+    track_body: false         # Track request body (security risk!)
+```
+
+### Environment Variables
+
+```env
+USAGE_TRACKER_ENABLED=true       # Master switch (default: true)
+USAGE_TRACKER_DRIVER=database    # 'database', 'file', or 'memory'
+USAGE_TRACKER_SAMPLE_RATE=100    # Track X% of requests (1-100)
+```
+
+### API Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /usage/stats` | Overall statistics (by period, endpoint, status) |
+| `GET /usage/top` | Top endpoints by request count |
+| `GET /usage/slow` | Slowest endpoints by response time |
+| `GET /usage/errors` | Error rates by endpoint |
+
+### Query Parameters
+
+| Parameter | Values | Description |
+|-----------|--------|-------------|
+| `period` | `hour`, `day`, `week`, `month`, `all` | Time period filter |
+| `limit` | `1-100` | Max results to return |
+| `endpoint` | `/path` | Filter by specific endpoint |
+
+### Example Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "total_requests": 1250,
+    "period_start": "2026-01-23 00:00:00",
+    "by_endpoint": [
+      {
+        "endpoint": "/todo",
+        "method": "GET",
+        "count": 450,
+        "avg_response_time": "12.50",
+        "error_count": 2
+      }
+    ],
+    "by_status_code": [
+      {"status_code": 200, "count": 1200},
+      {"status_code": 404, "count": 45}
+    ],
+    "by_hour": [
+      {"hour": 9, "count": 250},
+      {"hour": 10, "count": 320}
+    ]
+  }
+}
+```
 
 ## Project Structure
 
@@ -217,6 +419,10 @@ monstein/
 │   │   ├── JwtMiddleware.php
 │   │   ├── RateLimitMiddleware.php
 │   │   ├── ParamValidationMiddleware.php
+│   │   ├── FileUpload.php
+│   │   ├── FileUploadMiddleware.php
+│   │   ├── UsageTracker.php
+│   │   ├── UsageTrackingMiddleware.php
 │   │   └── SecurityUtils.php
 │   ├── Config/
 │   │   ├── Config.php           # Configuration
@@ -238,6 +444,10 @@ monstein/
 │   ├── php.ini                  # PHP settings
 │   ├── supervisord.conf         # Process manager
 │   └── mysql-init/              # Database init scripts
+├── storage/
+│   ├── uploads/                 # File uploads
+│   ├── ratelimit/               # Rate limit data
+│   └── logs/                    # Application logs
 ├── stubs/                       # Code generation templates
 ├── symfony/
 │   └── web/
