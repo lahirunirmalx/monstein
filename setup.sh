@@ -211,83 +211,9 @@ done
 # Source the .env file
 source .env
 
-# Create database tables
-echo -n "  Creating database tables"
-docker-compose exec -T db mariadb -umonstein -p"$DB_PASS" monstein << 'EOSQL' 2>/dev/null
-CREATE TABLE IF NOT EXISTS users (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    username VARCHAR(255) NOT NULL UNIQUE,
-    password VARCHAR(255) NOT NULL,
-    created_at DATETIME,
-    updated_at DATETIME,
-    deleted_at DATETIME
-);
-CREATE TABLE IF NOT EXISTS categories (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    user_id INT UNSIGNED NOT NULL,
-    created_at DATETIME,
-    updated_at DATETIME,
-    deleted_at DATETIME,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
-CREATE TABLE IF NOT EXISTS todo (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    category_id INT UNSIGNED NOT NULL,
-    user_id INT UNSIGNED NOT NULL,
-    created_at DATETIME,
-    updated_at DATETIME,
-    deleted_at DATETIME,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
-);
-CREATE TABLE IF NOT EXISTS files (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    user_id INT UNSIGNED NOT NULL,
-    original_name VARCHAR(255) NOT NULL,
-    stored_name VARCHAR(255) NOT NULL,
-    mime_type VARCHAR(100) NOT NULL,
-    size INT UNSIGNED NOT NULL DEFAULT 0,
-    path VARCHAR(500) NULL,
-    hash VARCHAR(64) NULL,
-    content LONGTEXT NULL,
-    created_at DATETIME,
-    updated_at DATETIME,
-    deleted_at DATETIME,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    INDEX idx_files_user (user_id),
-    INDEX idx_files_hash (hash)
-);
-CREATE TABLE IF NOT EXISTS usage_logs (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    endpoint VARCHAR(255) NOT NULL,
-    method VARCHAR(10) NOT NULL,
-    status_code INT UNSIGNED NOT NULL DEFAULT 200,
-    response_time_ms DECIMAL(10,2) NOT NULL DEFAULT 0,
-    user_id INT UNSIGNED NULL,
-    ip_address VARCHAR(45) NULL,
-    user_agent VARCHAR(500) NULL,
-    request_size INT UNSIGNED NOT NULL DEFAULT 0,
-    response_size INT UNSIGNED NOT NULL DEFAULT 0,
-    route_name VARCHAR(100) NULL,
-    metadata JSON NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_usage_endpoint (endpoint),
-    INDEX idx_usage_method (method),
-    INDEX idx_usage_status (status_code),
-    INDEX idx_usage_user (user_id),
-    INDEX idx_usage_created (created_at),
-    INDEX idx_usage_endpoint_method (endpoint, method)
-);
-EOSQL
-echo -e " ${GREEN}✓${NC}"
-
-# Create demo user
-echo -n "  Creating demo user"
-DEMO_PASS_HASH=$(docker-compose exec -T app php -r "echo password_hash('demo123', PASSWORD_DEFAULT);" 2>/dev/null)
-docker-compose exec -T db mariadb -umonstein -p"$DB_PASS" monstein -e \
-    "INSERT IGNORE INTO users (username, password, created_at, updated_at) VALUES ('demo', '$DEMO_PASS_HASH', NOW(), NOW());" 2>/dev/null
+# Create database tables and demo user from SQL script
+echo -n "  Creating database tables and demo user"
+docker-compose exec -T db mariadb -umonstein -p"$DB_PASS" monstein < "${SCRIPT_DIR}/database/db_script.sql" 2>/dev/null
 echo -e " ${GREEN}✓${NC}"
 
 # Wait for API
