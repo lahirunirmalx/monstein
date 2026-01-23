@@ -156,6 +156,18 @@ LOG_LEVEL=INFO
 # Rate Limiting
 RATE_LIMIT_MAX=100
 RATE_LIMIT_WINDOW=60
+
+# Trusted Proxies (Docker network)
+TRUSTED_PROXIES=172.16.0.0/12,10.0.0.0/8,127.0.0.1
+
+# File Uploads
+FILE_STORAGE_PATH=/app/storage/uploads
+FILE_BASE_URL=http://localhost:${LB_PORT}
+
+# Usage Tracking
+USAGE_TRACKER_ENABLED=true
+USAGE_TRACKER_DRIVER=database
+USAGE_TRACKER_SAMPLE_RATE=100
 EOF
 
 echo -e "${GREEN}✓ Environment file created${NC}"
@@ -230,6 +242,44 @@ CREATE TABLE IF NOT EXISTS todo (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
 );
+CREATE TABLE IF NOT EXISTS files (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id INT UNSIGNED NOT NULL,
+    original_name VARCHAR(255) NOT NULL,
+    stored_name VARCHAR(255) NOT NULL,
+    mime_type VARCHAR(100) NOT NULL,
+    size INT UNSIGNED NOT NULL DEFAULT 0,
+    path VARCHAR(500) NULL,
+    hash VARCHAR(64) NULL,
+    content LONGTEXT NULL,
+    created_at DATETIME,
+    updated_at DATETIME,
+    deleted_at DATETIME,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_files_user (user_id),
+    INDEX idx_files_hash (hash)
+);
+CREATE TABLE IF NOT EXISTS usage_logs (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    endpoint VARCHAR(255) NOT NULL,
+    method VARCHAR(10) NOT NULL,
+    status_code INT UNSIGNED NOT NULL DEFAULT 200,
+    response_time_ms DECIMAL(10,2) NOT NULL DEFAULT 0,
+    user_id INT UNSIGNED NULL,
+    ip_address VARCHAR(45) NULL,
+    user_agent VARCHAR(500) NULL,
+    request_size INT UNSIGNED NOT NULL DEFAULT 0,
+    response_size INT UNSIGNED NOT NULL DEFAULT 0,
+    route_name VARCHAR(100) NULL,
+    metadata JSON NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_usage_endpoint (endpoint),
+    INDEX idx_usage_method (method),
+    INDEX idx_usage_status (status_code),
+    INDEX idx_usage_user (user_id),
+    INDEX idx_usage_created (created_at),
+    INDEX idx_usage_endpoint_method (endpoint, method)
+);
 EOSQL
 echo -e " ${GREEN}✓${NC}"
 
@@ -276,6 +326,15 @@ echo -e "  ${YELLOW}# Get JWT token${NC}"
 echo -e "  curl -X POST http://localhost:${LB_PORT}/issueToken \\"
 echo -e "    -H 'Content-Type: application/json' \\"
 echo -e "    -d '{\"username\":\"demo\",\"password\":\"demo123\"}'"
+echo ""
+echo -e "  ${YELLOW}# Upload a file${NC}"
+echo -e "  curl -X POST http://localhost:${LB_PORT}/files \\"
+echo -e "    -H 'Authorization: Bearer YOUR_TOKEN' \\"
+echo -e "    -F 'file=@/path/to/file.jpg'"
+echo ""
+echo -e "  ${YELLOW}# View usage stats${NC}"
+echo -e "  curl http://localhost:${LB_PORT}/usage/stats \\"
+echo -e "    -H 'Authorization: Bearer YOUR_TOKEN'"
 echo ""
 echo -e "${CYAN}Container Status:${NC}"
 docker-compose ps --format "table {{.Name}}\t{{.Status}}\t{{.Ports}}" 2>/dev/null | grep -v "deploy sub-keys" || docker-compose ps
