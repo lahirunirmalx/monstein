@@ -11,6 +11,15 @@
 #     {param_name}: validation_type
 #   Supported types: id, integer, uuid, slug, alpha, alphanumeric
 #
+# File Upload Options (optional):
+#   file_upload:
+#     enabled: true/false
+#     max_size: number (bytes, default: 10485760 = 10MB)
+#     allowed_types: 'images' | 'documents' | 'all' | [array of mime types]
+#     storage: 'filesystem' | 'database' | 'both'
+#     db_format: 'base64' | 'blob' (for database storage)
+#     strict: true/false (return error if any file fails, default: false)
+#
 # ============================================================================
 
 issueToken:
@@ -54,3 +63,37 @@ category_todos:
   method: [ get ]
   params:
     id: id
+
+# ============================================================================
+# File Upload Endpoints
+# ============================================================================
+
+files:
+  url: /files
+  controller: \Monstein\Controllers\FileCollectionController
+  method: [ post, get ]
+  file_upload:
+    enabled: true
+    max_size: 10485760            # 10MB
+    allowed_types: all            # 'images', 'documents', or 'all'
+    storage: filesystem           # 'filesystem', 'database', or 'both'
+    db_format: base64             # 'base64' or 'blob'
+
+file:
+  url: /files/{id}
+  controller: \Monstein\Controllers\FileEntityController
+  method: [ get, delete ]
+  params:
+    id: id
+
+# Example: Images only endpoint with database storage
+files_images:
+  url: /images
+  controller: \Monstein\Controllers\FileCollectionController
+  method: [ post, get ]
+  file_upload:
+    enabled: true
+    max_size: 5242880             # 5MB for images
+    allowed_types: images
+    storage: database             # Store in database
+    db_format: base64

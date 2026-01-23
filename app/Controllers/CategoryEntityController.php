@@ -44,7 +44,7 @@ class CategoryEntityController extends EntityController
         // check category ID exists
         $category = $user->categories()->withTrashed()->find($data['id']);
         if (!$errors && !$category) {
-            $errors = ['Category not found: '.$data['id']];
+            $errors = ['Category not found'];  // Generic message prevents ID enumeration
         }
         if (!$errors) {
             $deleted = (isset($data['force']) && !empty($data['force'])) ? $category->forceDelete() : $category->delete();
@@ -64,7 +64,7 @@ class CategoryEntityController extends EntityController
 
         $category = $user->categories()->find($data['id']);
         if (!$errors && !$category) {
-            $errors = ['Category not found: '.$data['id']];
+            $errors = ['Category not found'];  // Generic message prevents ID enumeration
         }
         if (!$errors && isset($data['name']) && $user->categories()->where('name', $data['name'])->where('id', '!=', $category->id)->first()) {
             $errors = ['Category name already exists'];

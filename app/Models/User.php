@@ -55,6 +55,16 @@ class User extends Model
     }
 
     /**
+     * Get the files for the user
+     * 
+     * @return HasMany
+     */
+    public function files(): HasMany
+    {
+        return $this->hasMany(File::class, 'user_id');
+    }
+
+    /**
      * Hash the password before storing
      * 
      * @param string $pass Plain text password

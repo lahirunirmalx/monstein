@@ -5,6 +5,7 @@ use Monstein\Base\BaseRouter;
 use Monstein\Base\JwtMiddleware;
 use Monstein\Base\RateLimitMiddleware;
 use Monstein\Base\ParamValidationMiddleware;
+use Monstein\Base\FileUploadMiddleware;
 use Monstein\Config\Config;
 
 /**
@@ -33,12 +34,13 @@ class Middleware
         $this->app = $app;
         $this->container = $app->getContainer();
         
-        // Order matters: rate limiting first, then param validation, security headers, CORS, and JWT
+        // Order matters: rate limiting first, then param validation, security headers, CORS, JWT, and file upload
         $this->rateLimit();
         $this->paramValidation();
         $this->securityHeaders();
         $this->cors();
         $this->jwt();
+        $this->fileUpload();
     }
 
     /**
@@ -183,6 +185,19 @@ class Middleware
             'logger' => $this->container['logger'],
             'secure' => !Config::isDebug(),
             'relaxed' => ['localhost', '127.0.0.1'],
+        ]));
+    }
+
+    /**
+     * Configure File Upload middleware
+     * 
+     * Processes multipart form data and base64 encoded files for routes
+     * with file_upload configuration in routing.yml.
+     */
+    private function fileUpload(): void
+    {
+        $this->app->add(new FileUploadMiddleware([
+            'logger' => $this->container['logger'],
         ]));
     }
 }

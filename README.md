@@ -434,14 +434,77 @@ Images are automatically built and pushed on every push to `main` branch.
 
 ## Security
 
-- JWT tokens with configurable expiration
-- Password hashing with bcrypt
-- Security headers on all responses
-- Environment-based configuration (no hardcoded secrets)
-- CORS protection
-- Rate limiting (configurable per route)
-- XSS/MITM protection headers
-- Parameter validation on routes
+### Implemented Protections
+
+| Category | Protection |
+|----------|------------|
+| **SQL Injection** | Eloquent ORM with parameterized queries |
+| **XSS** | Input sanitization, CSP headers, output encoding utilities |
+| **Authentication** | JWT tokens with configurable expiration |
+| **Password Storage** | bcrypt hashing with PASSWORD_DEFAULT |
+| **Password Policy** | Minimum 8 chars, complexity requirements |
+| **Rate Limiting** | Configurable per-route limits (DDoS/brute-force) |
+| **MITM** | HSTS headers, HTTPS enforcement in production |
+| **Clickjacking** | X-Frame-Options: DENY |
+| **Information Disclosure** | Generic error messages, debug-only details |
+| **IDOR** | User-scoped queries (no cross-user access) |
+| **IP Spoofing** | Trusted proxy configuration |
+
+### CSRF Protection
+
+This is a **stateless API** using JWT Bearer tokens (not cookies). CSRF protection is inherent when:
+
+- **JWT stored in memory/localStorage**: Immune to CSRF (tokens not auto-sent)
+- **JWT stored in cookies**: Requires additional protection
+
+**For cookie-based JWT storage, add these protections:**
+
+```javascript
+// Frontend: Set cookie with SameSite attribute
+document.cookie = `token=${jwt}; SameSite=Strict; Secure; Path=/`;
+```
+
+**Recommended cookie settings:**
+
+| Attribute | Value | Purpose |
+|-----------|-------|---------|
+| `SameSite` | `Strict` | Prevents cross-site requests |
+| `Secure` | `true` | HTTPS only |
+| `HttpOnly` | `true` | Prevents XSS access |
+| `Path` | `/` | Scope to API |
+
+### Trusted Proxies
+
+When behind a load balancer, configure trusted proxies to prevent IP spoofing:
+
+```env
+# .env
+TRUSTED_PROXIES=172.16.0.0/12,10.0.0.0/8,127.0.0.1
+```
+
+### Security Headers
+
+All responses include:
+
+```
+Content-Security-Policy: default-src 'none'; frame-ancestors 'none'
+Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: strict-origin-when-cross-origin
+Permissions-Policy: geolocation=(), camera=(), microphone=()
+```
+
+### Environment Security
+
+```env
+# Required in production
+JWT_SECRET=<generate-with: openssl rand -base64 32>
+APP_ENV=production
+APP_DEBUG=false
+CORS_ORIGIN=https://yourdomain.com  # NOT *
+```
 
 ## Contributing
 

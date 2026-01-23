@@ -26,6 +26,9 @@ class BaseRouter
     /** @var array Parameter validation rules per path */
     private static $paramRules = [];
 
+    /** @var array File upload configurations per path */
+    private static $fileUploadConfigs = [];
+
     /** @var array Default rate limits */
     private static $defaultLimits = [
         'secure' => ['max_requests' => 100, 'window_seconds' => 60],
@@ -93,6 +96,9 @@ class BaseRouter
             // Parse parameter validation rules
             $this->parseParamRules($url, $route);
             
+            // Parse file upload configuration
+            $this->parseFileUploadConfig($url, $route);
+            
             $method = $this->getMethods($route['method']);
             $service = $route['service'] ?? 'handle';
             $controller = $route['controller'];
@@ -157,6 +163,19 @@ class BaseRouter
     {
         if (isset($route['params']) && is_array($route['params'])) {
             self::$paramRules[$url] = $route['params'];
+        }
+    }
+
+    /**
+     * Parse file upload configuration for a route
+     * 
+     * @param string $url Route URL
+     * @param array $route Route configuration
+     */
+    private function parseFileUploadConfig(string $url, array $route): void
+    {
+        if (isset($route['file_upload']) && is_array($route['file_upload'])) {
+            self::$fileUploadConfigs[$url] = $route['file_upload'];
         }
     }
 
@@ -239,6 +258,39 @@ class BaseRouter
     public function getAllRateLimits(): array
     {
         return self::$rateLimits;
+    }
+
+    /**
+     * Get file upload configuration for a path
+     * 
+     * @param string $path Request path
+     * @return array File upload config or empty array
+     */
+    public function getFileUploadConfig(string $path): array
+    {
+        // Try exact match first
+        if (isset(self::$fileUploadConfigs[$path])) {
+            return self::$fileUploadConfigs[$path];
+        }
+        
+        // Try pattern matching for paths with parameters
+        foreach (self::$fileUploadConfigs as $pattern => $config) {
+            if ($this->pathMatchesPattern($path, $pattern)) {
+                return $config;
+            }
+        }
+        
+        return [];
+    }
+
+    /**
+     * Get all file upload configurations
+     * 
+     * @return array
+     */
+    public function getAllFileUploadConfigs(): array
+    {
+        return self::$fileUploadConfigs;
     }
 
     /**
