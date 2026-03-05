@@ -10,6 +10,9 @@
  *   ./bin/monstein make:controller <ControllerName>
  *   ./bin/monstein make:resource <ResourceName>
  *   ./bin/monstein make:migration <MigrationName>
+ *   ./bin/monstein make:file-endpoint <EndpointName>
+ *   ./bin/monstein usage:stats
+ *   ./bin/monstein routes:list
  */
 
 // Color codes for terminal output
@@ -17,6 +20,8 @@ define('COLOR_GREEN', "\033[32m");
 define('COLOR_YELLOW', "\033[33m");
 define('COLOR_RED', "\033[31m");
 define('COLOR_CYAN', "\033[36m");
+define('COLOR_WHITE', "\033[37m");
+define('COLOR_BOLD', "\033[1m");
 define('COLOR_RESET', "\033[0m");
 
 // Base paths
@@ -24,6 +29,7 @@ define('BASE_PATH', dirname(__DIR__));
 define('APP_PATH', BASE_PATH . '/app');
 define('STUBS_PATH', BASE_PATH . '/stubs');
 define('MIGRATIONS_PATH', BASE_PATH . '/db/migrations');
+define('CONFIG_PATH', APP_PATH . '/Config');
 
 /**
  * Print colored output
@@ -232,7 +238,61 @@ function makeMigration(string $name): void
 /**
  * Generate route configuration
  */
-function generateRouteConfig(string $name): string
+function generateRouteConfig(string $name, array $options = []): string
+{
+    $className = studly($name);
+    $routeName = strtolower($name);
+    $routeNamePlural = strtolower(pluralize($name));
+    
+    $config = <<<YAML
+# Add these routes to app/Config/routing.yml
+
+{$routeNamePlural}:
+  url: /{$routeNamePlural}
+  controller: \Monstein\Controllers\\{$className}CollectionController
+  method: [ post, get ]
+YAML;
+
+    // Add tracking if specified
+    if (!empty($options['tracking'])) {
+        $config .= <<<YAML
+
+  tracking:
+    enabled: true
+    name: "{$routeNamePlural}_list"
+YAML;
+    }
+
+    // Add file upload if specified
+    if (!empty($options['file_upload'])) {
+        $config .= <<<YAML
+
+  file_upload:
+    enabled: true
+    max_size: 10485760
+    allowed_types: all
+    storage: filesystem
+YAML;
+    }
+
+    $config .= <<<YAML
+
+
+{$routeName}:
+  url: /{$routeName}/{id}
+  controller: \Monstein\Controllers\\{$className}EntityController
+  method: [ put, get, delete ]
+  params:
+    id: id
+YAML;
+
+    return $config;
+}
+
+/**
+ * Generate file upload route configuration
+ */
+function generateFileUploadRouteConfig(string $name): string
 {
     $className = studly($name);
     $routeName = strtolower($name);
@@ -245,18 +305,29 @@ function generateRouteConfig(string $name): string
   url: /{$routeNamePlural}
   controller: \Monstein\Controllers\\{$className}CollectionController
   method: [ post, get ]
+  file_upload:
+    enabled: true
+    max_size: 10485760            # 10MB
+    allowed_types: all            # 'images', 'documents', or 'all'
+    storage: filesystem           # 'filesystem', 'database', or 'both'
+    db_format: base64             # 'base64' or 'blob'
+  tracking:
+    enabled: true
+    name: "{$routeNamePlural}_upload"
 
 {$routeName}:
   url: /{$routeName}/{id}
   controller: \Monstein\Controllers\\{$className}EntityController
-  method: [ put, get, delete ]
+  method: [ get, delete ]
+  params:
+    id: id
 YAML;
 }
 
 /**
  * Make full resource (model + controllers + migration + routes)
  */
-function makeResource(string $name): void
+function makeResource(string $name, array $options = []): void
 {
     output("\nCreating resource: " . studly($name), COLOR_CYAN);
     output(str_repeat('-', 50));
@@ -268,9 +339,447 @@ function makeResource(string $name): void
     
     output("\n" . str_repeat('-', 50));
     info("Add the following to app/Config/routing.yml:\n");
-    echo generateRouteConfig($name) . "\n\n";
+    echo generateRouteConfig($name, $options) . "\n\n";
     
     info("Run migration with: ./vendor/bin/phinx migrate");
+    output("");
+}
+
+/**
+ * Make file upload endpoint (creates controller optimized for file handling)
+ */
+function makeFileEndpoint(string $name): void
+{
+    output("\nCreating file upload endpoint: " . studly($name), COLOR_CYAN);
+    output(str_repeat('-', 50));
+    
+    $className = studly($name);
+    
+    // Create a file-optimized collection controller
+    $collectionContent = <<<PHP
+<?php
+
+namespace Monstein\Controllers;
+
+use Monstein\Base\BaseController;
+use Monstein\Models\File;
+use Psr\Http\Message\ResponseInterface as Response;
+use Psr\Http\Message\ServerRequestInterface as Request;
+use Respect\Validation\Validator as V;
+
+/**
+ * {$className} Collection Controller
+ * 
+ * Handles file upload operations for {$className}.
+ * Supports both multipart form data and base64 encoded files.
+ */
+class {$className}CollectionController extends BaseController
+{
+    public function validateGetRequest()
+    {
+        return [];
+    }
+
+    public function validatePostRequest()
+    {
+        return [
+            // File validation is handled by FileUploadMiddleware
+        ];
+    }
+
+    public function validatePatchRequest()
+    {
+        return [];
+    }
+
+    public function validatePutRequest()
+    {
+        return [];
+    }
+
+    public function validateDeleteRequest()
+    {
+        return [];
+    }
+
+    /**
+     * GET - List uploaded files
+     */
+    public function doGet(Request \$request, Response \$response, \$args, \$cleanValues)
+    {
+        \$user = \$request->getAttribute('user');
+        \$files = File::where('user_id', \$user->id)
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return \$response->withJson([
+            'success' => true,
+            'data' => \$files->map(function (\$file) {
+                return [
+                    'id' => \$file->id,
+                    'original_name' => \$file->original_name,
+                    'mime_type' => \$file->mime_type,
+                    'size' => \$file->size,
+                    'url' => \$file->getUrl(),
+                    'created_at' => \$file->created_at->toIso8601String(),
+                ];
+            }),
+        ], 200);
+    }
+
+    /**
+     * POST - Upload new file(s)
+     */
+    public function doPost(Request \$request, Response \$response, \$args, \$cleanValues)
+    {
+        \$user = \$request->getAttribute('user');
+        \$processedFiles = \$request->getAttribute('processed_files', []);
+        \$uploadErrors = \$request->getAttribute('upload_errors', []);
+
+        if (empty(\$processedFiles) && !empty(\$uploadErrors)) {
+            return \$response->withJson([
+                'success' => false,
+                'errors' => \$uploadErrors,
+            ], 400);
+        }
+
+        if (empty(\$processedFiles)) {
+            return \$response->withJson([
+                'success' => false,
+                'errors' => 'No files uploaded',
+            ], 400);
+        }
+
+        \$savedFiles = [];
+        foreach (\$processedFiles as \$key => \$fileInfo) {
+            \$file = new File();
+            \$file->user_id = \$user->id;
+            \$file->original_name = \$fileInfo['original_name'];
+            \$file->stored_name = \$fileInfo['stored_name'];
+            \$file->mime_type = \$fileInfo['mime_type'];
+            \$file->size = \$fileInfo['size'];
+            \$file->path = \$fileInfo['path'] ?? null;
+            \$file->hash = \$fileInfo['hash'] ?? null;
+            
+            if (isset(\$fileInfo['content'])) {
+                \$file->content = \$fileInfo['content'];
+            }
+            
+            \$file->save();
+            
+            \$savedFiles[] = [
+                'id' => \$file->id,
+                'original_name' => \$file->original_name,
+                'mime_type' => \$file->mime_type,
+                'size' => \$file->size,
+                'url' => \$file->getUrl(),
+            ];
+        }
+
+        return \$response->withJson([
+            'success' => true,
+            'data' => \$savedFiles,
+            'message' => count(\$savedFiles) . ' file(s) uploaded successfully',
+        ], 201);
+    }
+
+    public function doPut(Request \$request, Response \$response, \$args, \$cleanValues)
+    {
+        return \$this->handleUnsupportedMethod(\$request, \$response);
+    }
+
+    public function doPatch(Request \$request, Response \$response, \$args, \$cleanValues)
+    {
+        return \$this->handleUnsupportedMethod(\$request, \$response);
+    }
+
+    public function doDelete(Request \$request, Response \$response, \$args, \$cleanValues)
+    {
+        return \$this->handleUnsupportedMethod(\$request, \$response);
+    }
+}
+PHP;
+
+    // Create entity controller
+    $entityContent = <<<PHP
+<?php
+
+namespace Monstein\Controllers;
+
+use Monstein\Base\BaseController;
+use Monstein\Models\File;
+use Psr\Http\Message\ResponseInterface as Response;
+use Psr\Http\Message\ServerRequestInterface as Request;
+use Respect\Validation\Validator as V;
+
+/**
+ * {$className} Entity Controller
+ * 
+ * Handles individual file operations.
+ */
+class {$className}EntityController extends BaseController
+{
+    public function validateGetRequest()
+    {
+        return [];
+    }
+
+    public function validatePostRequest()
+    {
+        return [];
+    }
+
+    public function validatePatchRequest()
+    {
+        return [];
+    }
+
+    public function validatePutRequest()
+    {
+        return [];
+    }
+
+    public function validateDeleteRequest()
+    {
+        return [];
+    }
+
+    /**
+     * GET - Get file info or download
+     */
+    public function doGet(Request \$request, Response \$response, \$args, \$cleanValues)
+    {
+        \$user = \$request->getAttribute('user');
+        \$id = \$args['id'];
+
+        \$file = File::where('id', \$id)
+            ->where('user_id', \$user->id)
+            ->first();
+
+        if (!\$file) {
+            return \$response->withJson([
+                'success' => false,
+                'errors' => 'File not found',
+            ], 404);
+        }
+
+        // Check if download is requested
+        \$params = \$request->getQueryParams();
+        if (isset(\$params['download']) && \$params['download'] === 'true') {
+            return \$file->download(\$response);
+        }
+
+        return \$response->withJson([
+            'success' => true,
+            'data' => [
+                'id' => \$file->id,
+                'original_name' => \$file->original_name,
+                'mime_type' => \$file->mime_type,
+                'size' => \$file->size,
+                'url' => \$file->getUrl(),
+                'created_at' => \$file->created_at->toIso8601String(),
+            ],
+        ], 200);
+    }
+
+    /**
+     * DELETE - Delete file
+     */
+    public function doDelete(Request \$request, Response \$response, \$args, \$cleanValues)
+    {
+        \$user = \$request->getAttribute('user');
+        \$id = \$args['id'];
+
+        \$file = File::where('id', \$id)
+            ->where('user_id', \$user->id)
+            ->first();
+
+        if (!\$file) {
+            return \$response->withJson([
+                'success' => false,
+                'errors' => 'File not found',
+            ], 404);
+        }
+
+        // Delete physical file if exists
+        if (\$file->path && file_exists(\$file->path)) {
+            unlink(\$file->path);
+        }
+
+        \$file->delete();
+
+        return \$response->withJson([
+            'success' => true,
+            'message' => 'File deleted',
+        ], 200);
+    }
+
+    public function doPost(Request \$request, Response \$response, \$args, \$cleanValues)
+    {
+        return \$this->handleUnsupportedMethod(\$request, \$response);
+    }
+
+    public function doPut(Request \$request, Response \$response, \$args, \$cleanValues)
+    {
+        return \$this->handleUnsupportedMethod(\$request, \$response);
+    }
+
+    public function doPatch(Request \$request, Response \$response, \$args, \$cleanValues)
+    {
+        return \$this->handleUnsupportedMethod(\$request, \$response);
+    }
+}
+PHP;
+
+    $collectionPath = APP_PATH . '/Controllers/' . $className . 'CollectionController.php';
+    $entityPath = APP_PATH . '/Controllers/' . $className . 'EntityController.php';
+
+    if (writeFile($collectionPath, $collectionContent)) {
+        success("Created Controller: app/Controllers/{$className}CollectionController.php");
+    }
+    
+    if (writeFile($entityPath, $entityContent)) {
+        success("Created Controller: app/Controllers/{$className}EntityController.php");
+    }
+
+    output("\n" . str_repeat('-', 50));
+    info("Add the following to app/Config/routing.yml:\n");
+    echo generateFileUploadRouteConfig($name) . "\n\n";
+    
+    info("Note: The File model already exists. Use it for storing file metadata.");
+    output("");
+}
+
+/**
+ * List all routes from routing.yml
+ */
+function listRoutes(): void
+{
+    $routingPath = CONFIG_PATH . '/routing.yml';
+    
+    if (!file_exists($routingPath)) {
+        error("routing.yml not found");
+        return;
+    }
+    
+    $routes = yaml_parse_file($routingPath);
+    
+    if ($routes === false) {
+        // Fallback: parse manually if yaml extension not available
+        $content = file_get_contents($routingPath);
+        // Simple parse
+        preg_match_all('/^(\w+):\s*\n\s+url:\s*(\S+)\s*\n\s+controller:\s*(\S+)\s*\n\s+method:\s*\[\s*([^\]]+)\s*\]/m', $content, $matches, PREG_SET_ORDER);
+        
+        output("\n" . COLOR_BOLD . "Registered Routes" . COLOR_RESET);
+        output(str_repeat('═', 80));
+        
+        printf("%-20s %-30s %-10s %s\n", "NAME", "URL", "METHODS", "CONTROLLER");
+        output(str_repeat('-', 80));
+        
+        foreach ($matches as $match) {
+            $name = $match[1];
+            $url = $match[2];
+            $methods = strtoupper(str_replace(' ', '', $match[4]));
+            $controller = basename(str_replace('\\', '/', $match[3]));
+            
+            printf("%-20s %-30s %-10s %s\n", $name, $url, $methods, $controller);
+        }
+        return;
+    }
+    
+    output("\n" . COLOR_BOLD . "Registered Routes" . COLOR_RESET);
+    output(str_repeat('═', 80));
+    
+    printf("%-20s %-25s %-12s %-8s %-8s %s\n", 
+        "NAME", "URL", "METHODS", "SECURE", "TRACK", "OPTIONS");
+    output(str_repeat('-', 80));
+    
+    foreach ($routes as $name => $config) {
+        if (!is_array($config) || !isset($config['url'])) {
+            continue;
+        }
+        
+        $url = $config['url'];
+        $methods = is_array($config['method']) 
+            ? strtoupper(implode(',', $config['method']))
+            : strtoupper($config['method']);
+        $secure = ($config['is_secure'] ?? true) ? 'Yes' : 'No';
+        
+        // Tracking status
+        $tracking = 'Yes';
+        if (isset($config['tracking'])) {
+            if (is_bool($config['tracking'])) {
+                $tracking = $config['tracking'] ? 'Yes' : 'No';
+            } elseif (is_array($config['tracking'])) {
+                $tracking = ($config['tracking']['enabled'] ?? true) ? 'Yes' : 'No';
+            }
+        }
+        
+        // Extra options
+        $options = [];
+        if (isset($config['file_upload']['enabled']) && $config['file_upload']['enabled']) {
+            $options[] = 'upload';
+        }
+        if (isset($config['rate_limit']['enabled']) && $config['rate_limit']['enabled']) {
+            $options[] = 'rate:' . ($config['rate_limit']['max_requests'] ?? 100);
+        }
+        if (!empty($config['params'])) {
+            $options[] = 'params';
+        }
+        
+        $optStr = implode(', ', $options);
+        
+        printf("%-20s %-25s %-12s %-8s %-8s %s\n", 
+            $name, $url, $methods, $secure, $tracking, $optStr);
+    }
+    
+    output("");
+}
+
+/**
+ * Show usage statistics summary
+ */
+function showUsageStats(): void
+{
+    // Try to load and execute via the app
+    $envFile = BASE_PATH . '/.env';
+    
+    if (!file_exists($envFile)) {
+        warning("No .env file found. Using default settings.");
+    }
+    
+    output("\n" . COLOR_BOLD . "Usage Tracking Information" . COLOR_RESET);
+    output(str_repeat('═', 60));
+    
+    info("Usage tracking is configured per-route in routing.yml");
+    output("");
+    
+    output("Configuration options:");
+    output("  tracking: true               # Simple enable");
+    output("  tracking:");
+    output("    enabled: true              # Enable/disable");
+    output("    name: \"custom_name\"        # Custom name for analytics");
+    output("    track_user: true           # Track user ID");
+    output("    track_ip: true             # Track IP address");
+    output("    track_user_agent: false    # Track user agent");
+    output("    track_body: false          # Track request body (security risk!)");
+    output("");
+    
+    output("Environment variables:");
+    output("  USAGE_TRACKER_ENABLED=true       # Master switch");
+    output("  USAGE_TRACKER_DRIVER=database    # 'database', 'file', or 'memory'");
+    output("  USAGE_TRACKER_SAMPLE_RATE=100    # Track X% of requests");
+    output("");
+    
+    output("API Endpoints:");
+    output("  GET /usage/stats     - Overall statistics");
+    output("  GET /usage/top       - Top endpoints by request count");
+    output("  GET /usage/slow      - Slowest endpoints");
+    output("  GET /usage/errors    - Error rates by endpoint");
+    output("");
+    
+    info("Run migrations to create usage_logs table:");
+    output("  ./vendor/bin/phinx migrate");
     output("");
 }
 
@@ -286,23 +795,37 @@ function showHelp(): void
 ╚══════════════════════════════════════════════════════════════╝\033[0m
 
 \033[33mUsage:\033[0m
-  ./bin/monstein <command> <name>
+  ./bin/monstein <command> [name] [options]
 
-\033[33mCommands:\033[0m
-  \033[32mmake:resource\033[0m <Name>     Create full resource (model, controllers, migration)
-  \033[32mmake:entity\033[0m <Name>       Create a new Eloquent model
-  \033[32mmake:controller\033[0m <Name>   Create collection and entity controllers
-  \033[32mmake:migration\033[0m <Name>    Create a new Phinx migration
+\033[33mScaffolding Commands:\033[0m
+  \033[32mmake:resource\033[0m <Name>       Create full resource (model, controllers, migration)
+  \033[32mmake:entity\033[0m <Name>         Create a new Eloquent model
+  \033[32mmake:controller\033[0m <Name>     Create collection and entity controllers
+  \033[32mmake:migration\033[0m <Name>      Create a new Phinx migration
+  \033[32mmake:file-endpoint\033[0m <Name>  Create file upload endpoint controllers
+
+\033[33mInformation Commands:\033[0m
+  \033[32mroutes:list\033[0m                List all registered routes
+  \033[32musage:stats\033[0m                Show usage tracking configuration
 
 \033[33mExamples:\033[0m
-  ./bin/monstein make:resource Project
+  ./bin/monstein make:resource Product
   ./bin/monstein make:entity Task
   ./bin/monstein make:controller Comment
   ./bin/monstein make:migration Tag
+  ./bin/monstein make:file-endpoint Document
+  ./bin/monstein routes:list
+  ./bin/monstein usage:stats
 
 \033[33mNaming Convention:\033[0m
   - Use singular, StudlyCase names (e.g., Project, TaskItem)
   - Table names will be auto-generated as snake_case plural (e.g., projects, task_items)
+
+\033[33mFeatures:\033[0m
+  • File Upload Support  - Configure in routing.yml with file_upload options
+  • Usage Tracking       - Automatic API analytics via middleware
+  • Rate Limiting        - Per-route configurable rate limits
+  • Parameter Validation - Type validation for URL parameters
 
 
 HELP;
@@ -320,7 +843,10 @@ if ($argc < 2) {
 $command = $argv[1] ?? '';
 $name = $argv[2] ?? '';
 
-if (empty($name) && $command !== 'help' && $command !== '--help' && $command !== '-h') {
+// Commands that don't require a name
+$noNameCommands = ['help', '--help', '-h', 'routes:list', 'usage:stats'];
+
+if (empty($name) && !in_array($command, $noNameCommands)) {
     error("Missing name argument");
     showHelp();
     exit(1);
@@ -343,6 +869,18 @@ try {
             
         case 'make:migration':
             makeMigration($name);
+            break;
+            
+        case 'make:file-endpoint':
+            makeFileEndpoint($name);
+            break;
+            
+        case 'routes:list':
+            listRoutes();
+            break;
+            
+        case 'usage:stats':
+            showUsageStats();
             break;
             
         case 'help':

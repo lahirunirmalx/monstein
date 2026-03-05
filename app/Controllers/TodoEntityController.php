@@ -46,7 +46,7 @@ class TodoEntityController extends EntityController
         $errors = [];
         $todo = $user->todos()->withTrashed()->find($data['id']);
         if (!$errors && !$todo) {
-            $errors = ['Todo not found: '.$data['id']];
+            $errors = ['Todo not found'];  // Generic message prevents ID enumeration
         }
         if (!$errors) {
             $deleted = (isset($data['force']) && !empty($data['force'])) ? $todo->forceDelete() : $todo->delete();
@@ -64,7 +64,7 @@ class TodoEntityController extends EntityController
 
         $todo = $user->todos()->find($args['id']);
         if (!$errors && !$todo) {
-            $errors = ['Todo not found: '.$args['id']];
+            $errors = ['Todo not found'];  // Generic message prevents ID enumeration
         }
         if (!$errors) {
             if (isset($data['category'])) {

@@ -4,6 +4,9 @@ namespace Monstein;
 use Monstein\Base\BaseRouter;
 use Monstein\Base\HttpCode;
 use Monstein\Config\Config;
+use Monstein\Helpers\Cache;
+use Monstein\Helpers\HttpClient;
+use Monstein\Helpers\Encryption;
 use Monolog\Logger;
 use Monolog\Handler\StreamHandler;
 use Monolog\Handler\RotatingFileHandler;
@@ -83,6 +86,26 @@ class Dependencies
         $this->container['validator'] = function ($c) {
             return new \Awurth\SlimValidation\Validator();
         };
+
+        // Cache Service
+        $this->container['cache'] = function ($c) {
+            $cachePath = getenv('CACHE_PATH') ?: __DIR__ . '/../storage/cache';
+            return new Cache($cachePath);
+        };
+
+        // HTTP Client Service
+        $this->container['http'] = function ($c) {
+            return new HttpClient([
+                'timeout' => (int) (getenv('HTTP_CLIENT_TIMEOUT') ?: 30),
+                'verify_ssl' => getenv('HTTP_VERIFY_SSL') !== 'false',
+            ]);
+        };
+
+        // Encryption Service
+        $this->container['encryption'] = function ($c) {
+            $key = getenv('APP_KEY') ?: getenv('JWT_SECRET') ?: 'monstein-default-key';
+            return new Encryption($key);
+        };
     }
 
     /**
@@ -97,11 +120,24 @@ class Dependencies
         foreach ($urls as $url => $param) {
             $controllerClass = $param['controller'];
             $this->container[$controllerClass] = function ($c) use ($controllerClass) {
-                return new $controllerClass(
+                $controller = new $controllerClass(
                     $c->get('logger'),
                     $c->get('db'),
                     $c->get('validator')
                 );
+                
+                // Inject optional helper services if controller accepts them
+                if (method_exists($controller, 'setCache')) {
+                    $controller->setCache($c->get('cache'));
+                }
+                if (method_exists($controller, 'setHttp')) {
+                    $controller->setHttp($c->get('http'));
+                }
+                if (method_exists($controller, 'setEncryption')) {
+                    $controller->setEncryption($c->get('encryption'));
+                }
+                
+                return $controller;
             };
         }
     }

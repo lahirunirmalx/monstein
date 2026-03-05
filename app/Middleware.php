@@ -5,6 +5,8 @@ use Monstein\Base\BaseRouter;
 use Monstein\Base\JwtMiddleware;
 use Monstein\Base\RateLimitMiddleware;
 use Monstein\Base\ParamValidationMiddleware;
+use Monstein\Base\FileUploadMiddleware;
+use Monstein\Base\UsageTrackingMiddleware;
 use Monstein\Config\Config;
 
 /**
@@ -33,12 +35,14 @@ class Middleware
         $this->app = $app;
         $this->container = $app->getContainer();
         
-        // Order matters: rate limiting first, then param validation, security headers, CORS, and JWT
+        // Order matters: usage tracking first (to capture all requests), then rate limiting, validation, etc.
+        $this->usageTracking();
         $this->rateLimit();
         $this->paramValidation();
         $this->securityHeaders();
         $this->cors();
         $this->jwt();
+        $this->fileUpload();
     }
 
     /**
@@ -177,12 +181,41 @@ class Middleware
         // JWT middleware callbacks are dependent on DB - ensure Eloquent is initialized
         $this->container->get('db');
         
-        // Use custom JWT middleware for firebase/php-jwt 6.x compatibility
+        // Use custom JWT middleware for firebase/php-jwt 7.x
         $this->app->add(new JwtMiddleware([
             'ignore' => array_keys(BaseRouter::getInstance()->getIgnorePaths()),
             'logger' => $this->container['logger'],
             'secure' => !Config::isDebug(),
             'relaxed' => ['localhost', '127.0.0.1'],
+        ]));
+    }
+
+    /**
+     * Configure File Upload middleware
+     * 
+     * Processes multipart form data and base64 encoded files for routes
+     * with file_upload configuration in routing.yml.
+     */
+    private function fileUpload(): void
+    {
+        $this->app->add(new FileUploadMiddleware([
+            'logger' => $this->container['logger'],
+        ]));
+    }
+
+    /**
+     * Configure Usage Tracking middleware
+     * 
+     * Tracks API endpoint usage for analytics and monitoring.
+     * Configuration per-route in routing.yml, or globally via environment:
+     *   USAGE_TRACKER_ENABLED=true/false
+     *   USAGE_TRACKER_DRIVER=database/file/memory
+     *   USAGE_TRACKER_SAMPLE_RATE=100 (percentage)
+     */
+    private function usageTracking(): void
+    {
+        $this->app->add(new UsageTrackingMiddleware([
+            'logger' => $this->container['logger'],
         ]));
     }
 }

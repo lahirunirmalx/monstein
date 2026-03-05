@@ -3,6 +3,7 @@ namespace Monstein\Base;
 
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Psr\Http\Message\ResponseInterface as Response;
+use Monstein\Base\SecurityUtils;
 
 
 abstract class BaseController {
@@ -173,19 +174,59 @@ abstract class BaseController {
         ], HttpCode::HTTP_BAD_REQUEST);
     }
 
-    protected function getRequestData(Request $request,$args){
+    /**
+     * Get and sanitize request data
+     * 
+     * Collects data from route args and request body, sanitizing string inputs
+     * to prevent XSS attacks when data is stored and later displayed.
+     * 
+     * @param Request $request
+     * @param array $args
+     * @return array
+     */
+    protected function getRequestData(Request $request, $args)
+    {
         $dirty = array();
-        foreach ($args as $key => $value){
-            if(!isset($dirty[$key])){
-                $dirty[$key] = $value;
+        
+        // Collect route arguments
+        foreach ($args as $key => $value) {
+            if (!isset($dirty[$key])) {
+                $dirty[$key] = $this->sanitizeInput($value);
             }
         }
-        foreach ($request->getParsedBody() as $key => $value){
-            if(!isset($dirty[$key])){
-                $dirty[$key] = $value;
+        
+        // Collect request body
+        $body = $request->getParsedBody();
+        if (is_array($body)) {
+            foreach ($body as $key => $value) {
+                if (!isset($dirty[$key])) {
+                    $dirty[$key] = $this->sanitizeInput($value);
+                }
             }
         }
+        
         return $dirty;
+    }
+
+    /**
+     * Sanitize input to prevent XSS
+     * 
+     * Handles strings, arrays, and other types appropriately.
+     * 
+     * @param mixed $value
+     * @return mixed
+     */
+    protected function sanitizeInput($value)
+    {
+        if (is_string($value)) {
+            return SecurityUtils::sanitizeInput($value);
+        }
+        
+        if (is_array($value)) {
+            return array_map([$this, 'sanitizeInput'], $value);
+        }
+        
+        return $value;
     }
 
     public abstract function validateGetRequest();

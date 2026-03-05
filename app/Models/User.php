@@ -55,6 +55,16 @@ class User extends Model
     }
 
     /**
+     * Get the files for the user
+     * 
+     * @return HasMany
+     */
+    public function files(): HasMany
+    {
+        return $this->hasMany(File::class, 'user_id');
+    }
+
+    /**
      * Hash the password before storing
      * 
      * @param string $pass Plain text password
@@ -83,7 +93,7 @@ class User extends Model
             'jti' => bin2hex(random_bytes(16))  // Unique token ID
         ];
 
-        // firebase/php-jwt v6 requires explicit algorithm parameter
+        // firebase/php-jwt v7 requires explicit algorithm parameter
         $token = JWT::encode($payload, $authConfig['secret'], $authConfig['jwt']);
 
         return [
@@ -102,7 +112,7 @@ class User extends Model
     {
         try {
             $authConfig = Config::auth();
-            // firebase/php-jwt v6.x requires Key object
+            // firebase/php-jwt v7 requires Key object
             return JWT::decode($token, new Key($authConfig['secret'], $authConfig['jwt']));
         } catch (\Exception $e) {
             return null;

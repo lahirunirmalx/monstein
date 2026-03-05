@@ -258,4 +258,68 @@ class SecurityUtils
                str_repeat('*', $length - ($visibleChars * 2)) . 
                substr($value, -$visibleChars);
     }
+
+    /**
+     * Validate password strength
+     * 
+     * Requirements:
+     * - Minimum 8 characters
+     * - Maximum 72 characters (bcrypt limit)
+     * - At least one uppercase letter
+     * - At least one lowercase letter
+     * - At least one digit
+     * 
+     * @param string $password
+     * @return array ['valid' => bool, 'errors' => array]
+     */
+    public static function validatePasswordStrength(string $password): array
+    {
+        $errors = [];
+        $minLength = 8;
+        $maxLength = 72; // bcrypt limit
+        
+        if (strlen($password) < $minLength) {
+            $errors[] = "Password must be at least {$minLength} characters";
+        }
+        
+        if (strlen($password) > $maxLength) {
+            $errors[] = "Password must not exceed {$maxLength} characters";
+        }
+        
+        if (!preg_match('/[A-Z]/', $password)) {
+            $errors[] = 'Password must contain at least one uppercase letter';
+        }
+        
+        if (!preg_match('/[a-z]/', $password)) {
+            $errors[] = 'Password must contain at least one lowercase letter';
+        }
+        
+        if (!preg_match('/[0-9]/', $password)) {
+            $errors[] = 'Password must contain at least one digit';
+        }
+        
+        return [
+            'valid' => empty($errors),
+            'errors' => $errors
+        ];
+    }
+
+    /**
+     * Check if password is commonly used (basic check)
+     * 
+     * @param string $password
+     * @return bool True if password is in common list
+     */
+    public static function isCommonPassword(string $password): bool
+    {
+        // Top 20 most common passwords - extend as needed
+        $common = [
+            'password', '123456', '12345678', 'qwerty', 'abc123',
+            'password1', '111111', '123123', 'admin', 'letmein',
+            'welcome', 'monkey', 'dragon', 'master', 'login',
+            'passw0rd', 'iloveyou', 'trustno1', 'sunshine', 'princess'
+        ];
+        
+        return in_array(strtolower($password), $common, true);
+    }
 }

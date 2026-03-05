@@ -156,6 +156,18 @@ LOG_LEVEL=INFO
 # Rate Limiting
 RATE_LIMIT_MAX=100
 RATE_LIMIT_WINDOW=60
+
+# Trusted Proxies (Docker network)
+TRUSTED_PROXIES=172.16.0.0/12,10.0.0.0/8,127.0.0.1
+
+# File Uploads
+FILE_STORAGE_PATH=/app/storage/uploads
+FILE_BASE_URL=http://localhost:${LB_PORT}
+
+# Usage Tracking
+USAGE_TRACKER_ENABLED=true
+USAGE_TRACKER_DRIVER=database
+USAGE_TRACKER_SAMPLE_RATE=100
 EOF
 
 echo -e "${GREEN}✓ Environment file created${NC}"
@@ -199,45 +211,9 @@ done
 # Source the .env file
 source .env
 
-# Create database tables
-echo -n "  Creating database tables"
-docker-compose exec -T db mariadb -umonstein -p"$DB_PASS" monstein << 'EOSQL' 2>/dev/null
-CREATE TABLE IF NOT EXISTS users (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    username VARCHAR(255) NOT NULL UNIQUE,
-    password VARCHAR(255) NOT NULL,
-    created_at DATETIME,
-    updated_at DATETIME,
-    deleted_at DATETIME
-);
-CREATE TABLE IF NOT EXISTS categories (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    user_id INT UNSIGNED NOT NULL,
-    created_at DATETIME,
-    updated_at DATETIME,
-    deleted_at DATETIME,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
-CREATE TABLE IF NOT EXISTS todo (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    category_id INT UNSIGNED NOT NULL,
-    user_id INT UNSIGNED NOT NULL,
-    created_at DATETIME,
-    updated_at DATETIME,
-    deleted_at DATETIME,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
-);
-EOSQL
-echo -e " ${GREEN}✓${NC}"
-
-# Create demo user
-echo -n "  Creating demo user"
-DEMO_PASS_HASH=$(docker-compose exec -T app php -r "echo password_hash('demo123', PASSWORD_DEFAULT);" 2>/dev/null)
-docker-compose exec -T db mariadb -umonstein -p"$DB_PASS" monstein -e \
-    "INSERT IGNORE INTO users (username, password, created_at, updated_at) VALUES ('demo', '$DEMO_PASS_HASH', NOW(), NOW());" 2>/dev/null
+# Create database tables and demo user from SQL script
+echo -n "  Creating database tables and demo user"
+docker-compose exec -T db mariadb -umonstein -p"$DB_PASS" monstein < "${SCRIPT_DIR}/database/db_script.sql" 2>/dev/null
 echo -e " ${GREEN}✓${NC}"
 
 # Wait for API
@@ -276,6 +252,15 @@ echo -e "  ${YELLOW}# Get JWT token${NC}"
 echo -e "  curl -X POST http://localhost:${LB_PORT}/issueToken \\"
 echo -e "    -H 'Content-Type: application/json' \\"
 echo -e "    -d '{\"username\":\"demo\",\"password\":\"demo123\"}'"
+echo ""
+echo -e "  ${YELLOW}# Upload a file${NC}"
+echo -e "  curl -X POST http://localhost:${LB_PORT}/files \\"
+echo -e "    -H 'Authorization: Bearer YOUR_TOKEN' \\"
+echo -e "    -F 'file=@/path/to/file.jpg'"
+echo ""
+echo -e "  ${YELLOW}# View usage stats${NC}"
+echo -e "  curl http://localhost:${LB_PORT}/usage/stats \\"
+echo -e "    -H 'Authorization: Bearer YOUR_TOKEN'"
 echo ""
 echo -e "${CYAN}Container Status:${NC}"
 docker-compose ps --format "table {{.Name}}\t{{.Status}}\t{{.Ports}}" 2>/dev/null | grep -v "deploy sub-keys" || docker-compose ps

@@ -15,7 +15,7 @@ use Monstein\Models\User;
  * JWT Authentication Middleware
  * 
  * Validates JWT tokens and attaches user to request.
- * Replaces tuupola/slim-jwt-auth for firebase/php-jwt 6.x compatibility.
+ * Replaces tuupola/slim-jwt-auth for firebase/php-jwt 7.x.
  */
 class JwtMiddleware
 {

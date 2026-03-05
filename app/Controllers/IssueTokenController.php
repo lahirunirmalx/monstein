@@ -58,7 +58,8 @@ class IssueTokenController extends BaseController {
     {
         return [
             'username' => V::length(3, 25)->alnum('-')->noWhitespace(),
-            'password' => V::length(3, 25)->alnum('-')->noWhitespace()
+            // Password: 8-72 chars (bcrypt limit), allows special chars
+            'password' => V::length(8, 72)->noWhitespace()
         ];
     }
 
