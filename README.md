@@ -88,7 +88,7 @@ DB_NAME=monstein
 DB_USER=root
 DB_PASS=
 
-# JWT
+# JWT (firebase/php-jwt ^7.0: secret must be ≥32 bytes for HS256)
 JWT_SECRET=your-secret-key
 JWT_EXPIRES=60
 JWT_ALGORITHM=HS256

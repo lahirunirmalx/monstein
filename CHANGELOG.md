@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Features
 - **Slim 3 Framework** - Lightweight PHP micro-framework for building RESTful APIs
-- **JWT Authentication** - Secure token-based authentication with `firebase/php-jwt` ^6.0
+- **JWT Authentication** - Secure token-based authentication with `firebase/php-jwt` ^7.0
 - **Eloquent ORM** - Laravel's database ORM for elegant database operations
 - **Phinx Migrations** - Database version control with migration support
 - **Input Validation** - Request validation using Respect/Validation

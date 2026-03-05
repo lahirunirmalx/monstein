@@ -181,7 +181,7 @@ class Middleware
         // JWT middleware callbacks are dependent on DB - ensure Eloquent is initialized
         $this->container->get('db');
         
-        // Use custom JWT middleware for firebase/php-jwt 6.x compatibility
+        // Use custom JWT middleware for firebase/php-jwt 7.x
         $this->app->add(new JwtMiddleware([
             'ignore' => array_keys(BaseRouter::getInstance()->getIgnorePaths()),
             'logger' => $this->container['logger'],
